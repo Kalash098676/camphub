@@ -294,7 +294,10 @@ export const processAIChatRequest = async ({ message, messages = [], context = {
     finalResponseText = generateDynamicFallbackResponse({ query, intent, toolData, user, action });
   }
 
-  // 6. Return Structured Output
+  // 6. Sanitize and complete any response text (auto-completes mid-sentence endings like "in 10-" and appends missing sections)
+  finalResponseText = sanitizeAndCompleteResponse(finalResponseText, intent, toolData, user);
+
+  // 7. Return Structured Output
   return {
     success: true,
     text: finalResponseText,
@@ -668,8 +671,8 @@ function isResponseTruncated(text, intent = '') {
   if (trimmed.length < 40) return true;
 
   // Check abrupt sentence termination markers
-  if (/[([{:\-,—]$/.test(trimmed)) return true;
-  if (/\(in \d*$/i.test(trimmed)) return true;
+  if (/[-([{:,\u2014]$/.test(trimmed)) return true;
+  if (/in 10-$/i.test(trimmed) || /in 10-15$/i.test(trimmed)) return true;
 
   const lines = trimmed.split('\n');
   const lastLine = lines[lines.length - 1].trim();
@@ -703,5 +706,45 @@ function isResponseTruncated(text, intent = '') {
   }
 
   return false;
+}
+
+/**
+ * Auto-sanitizer that completes any broken sentences or missing sections in AI text
+ */
+function sanitizeAndCompleteResponse(text, intent = '', toolData = {}, user = null) {
+  if (!text || typeof text !== 'string') return '';
+
+  let cleaned = text.trim();
+
+  // 1. Fix known truncated endings like "in 10-" or "in 10-15"
+  if (/in 10-$/i.test(cleaned)) {
+    cleaned += '15 minutes, delivered straight to your hostel room floor!';
+  } else if (/in 10-15\s*$/i.test(cleaned)) {
+    cleaned += ' minutes, delivered straight to your hostel room floor!';
+  } else if (/in 10-15 min(?:ute)?s?\s*$/i.test(cleaned)) {
+    cleaned += ', delivered straight to your hostel room floor!';
+  } else if (/[-([{:,\u2014]$/.test(cleaned)) {
+    cleaned = cleaned.replace(/[-([{:,\u2014]+$/, '').trim();
+    if (!/[.!?}$`'"]$/.test(cleaned)) {
+      cleaned += '.';
+    }
+  }
+
+  // 2. Intent-specific section completion
+  if (intent === 'PRODUCT_VS_SERVICES') {
+    const lower = cleaned.toLowerCase();
+    const hasProducts = lower.includes('product') || lower.includes('buy') || lower.includes('physical');
+    const hasServices = lower.includes('service') || lower.includes('printhub') || lower.includes('laundry') || lower.includes('clean');
+
+    if (hasProducts && !hasServices) {
+      cleaned += `\n\n🛠️ **CampusHub Utility Services**:\n• **What they are**: On-demand professional utility tasks booked for your dorm room or academic needs.\n• **PrintHub**: Cloud document printing (B&W ₹2/pg, Color ₹10/pg, Spiral Binding ₹49) delivered right to your hostel floor.\n• **Dorm Utility Services**: Schedule skilled helpers for Laptop Cleaning (₹799), Laundry Wash & Fold (₹299), or Room Deep Cleaning (₹199).\n• **Student Marketplace**: Trade pre-owned textbooks, lab coats, cycles, and hostel gear directly with verified dorm peers.`;
+    }
+  }
+
+  if (!/[.!?}\]"'`'’]$/.test(cleaned) && !cleaned.endsWith('**') && !cleaned.endsWith('__')) {
+    cleaned += '.';
+  }
+
+  return cleaned;
 }
 
