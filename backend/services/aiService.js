@@ -216,14 +216,14 @@ export const processAIChatRequest = async ({ message, messages = [], context = {
         toolData.userAddresses = addresses;
       }
     }
-    else if (intent === 'SERVICE_LIST' || intent === 'SERVICE_INFO' || intent === 'PRINTING_INFO') {
+    else if (intent === 'PRINTING_INFO') {
+      toolData.printhub = campusHubKnowledge.printhub;
+      action = { type: 'NAVIGATE', target: 'printhub' };
+    }
+    else if (intent === 'SERVICE_LIST' || intent === 'SERVICE_INFO') {
       toolData.services = await getServices();
       toolData.printhub = campusHubKnowledge.printhub;
-      if (lowerQuery.includes('print') || lowerQuery.includes('pdf') || lowerQuery.includes('document')) {
-        action = { type: 'NAVIGATE', target: 'printhub' };
-      } else {
-        action = { type: 'NAVIGATE', target: 'services' };
-      }
+      action = { type: 'NAVIGATE', target: 'services' };
     }
     else if (intent === 'MARKETPLACE_INFO') {
       toolData.marketplace = campusHubKnowledge.marketplace;
@@ -341,16 +341,17 @@ function classifyIntent(query, context, isLoggedIn) {
   const lower = query.replace(/[“”"'`]/g, '').trim().toLowerCase();
 
   // Dedicated Product Intents (Cheapest, Out of Stock, Most Expensive, In Stock)
-  if (lower.match(/out of stock|unavailable products|items (?:are )?unavailable|products (?:are )?unavailable|zero stock|not available right now|marked as out of stock/i)) {
+  if (lower.includes('out of stock') || lower.includes('unavailable products') || lower.includes('items are unavailable') || lower.includes('products are unavailable') || lower.includes('zero stock') || lower.includes('not available right now') || lower.includes('marked as out of stock')) {
     return 'PRODUCT_OUT_OF_STOCK';
   }
-  if (lower.match(/which (?:is|product is|item is)? (?:the )?cheapest|what (?:is|'s) (?:the )?cheapest|show (?:me )?(?:the )?cheapest|least expensive|costs the least|cheapest product|cheapest item/i)) {
+  if (lower.includes('cheapest') || lower.includes('least expensive') || lower.includes('costs the least') || lower.includes('lowest price') || lower.includes('lowest priced') || lower.includes('cheaper')) {
+    if (lower.match(/which (?:one is|one's|one) (?:cheapest|cheaper)/i)) return 'FOLLOW_UP_CHEAPEST';
     return 'PRODUCT_CHEAPEST';
   }
-  if (lower.match(/most expensive|highest price|highest priced|costs the most/i)) {
+  if (lower.includes('most expensive') || lower.includes('highest price') || lower.includes('highest priced') || lower.includes('costs the most')) {
     return 'PRODUCT_MOST_EXPENSIVE';
   }
-  if (lower.match(/products (?:are )?(?:currently )?in stock|products (?:are )?available|what can i buy right now|available products|items (?:in )?stock/i)) {
+  if (lower.includes('in stock') || lower.includes('products are available') || lower.includes('what can i buy right now') || lower.includes('available products')) {
     return 'PRODUCT_IN_STOCK';
   }
 
@@ -716,7 +717,33 @@ async function generateDynamicFallbackResponse({ query, intent, toolData, user, 
     }
   }
 
-  if (intent === 'SERVICE_LIST' || intent === 'SERVICE_INFO' || intent === 'PRINTING_INFO') {
+  if (intent === 'PRINTING_INFO') {
+    return `Hey ${userName}! 🖨️ Here is everything you need to know about PrintHub cloud document printing on CampusHub:
+
+📄 **What You Can Print**:
+• Assignment PDFs, Lecture Notes, Lab Records, Presentations, & Exam Question Papers (PDF/DOCX/PNG format).
+
+💰 **Pricing & Print Rates**:
+• **Black & White Printing**: ₹2 / page
+• **Color Printing**: ₹10 / page
+• **Spiral Binding**: ₹49 (includes durable plastic front/back cover)
+• **Staple Binding**: ₹10
+• **Lamination**: ₹30
+
+⚙️ **Custom Print Options**:
+• Paper Sizes: A4, A3
+• Sides: Single-sided or Double-sided (Duplex)
+
+🚀 **How to Order & Use PrintHub**:
+1️⃣ Go to the **PrintHub** section from the top navigation bar.
+2️⃣ Upload your document file (PDF or DOCX).
+3️⃣ Select page range, color mode (B&W/Color), paper size, and binding preference.
+4️⃣ Enter your hostel block & room number.
+5️⃣ Checkout via Campus Pay Wallet, UPI, or Cash on Delivery.
+6️⃣ Our campus runner delivers your printed documents directly to your hostel room floor in 10-15 minutes!`;
+  }
+
+  if (intent === 'SERVICE_LIST' || intent === 'SERVICE_INFO') {
     return `Here are the CampusHub services currently available:
 
 • **🖨️ PrintHub Cloud Printing**: Upload PDF/DOC documents for B&W (₹2/pg) or Color (₹10/pg) printing with optional Spiral Binding (₹49), delivered to your dorm room floor.
