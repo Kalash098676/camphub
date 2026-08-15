@@ -33,6 +33,7 @@ export const searchProducts = async ({
   minPrice = null,
   maxPrice = null,
   stockOnly = false,
+  outOfStockOnly = false,
   sortBy = '', // 'price_asc', 'price_desc', 'rating'
   limit = 10
 } = {}) => {
@@ -51,7 +52,9 @@ export const searchProducts = async ({
         if (maxPrice !== null && !isNaN(maxPrice)) filter.price.$lte = Number(maxPrice);
       }
 
-      if (stockOnly) {
+      if (outOfStockOnly) {
+        filter.stock = { $lte: 0 };
+      } else if (stockOnly) {
         filter.stock = { $gt: 0 };
       }
 
@@ -118,6 +121,12 @@ export const searchProducts = async ({
 
     if (maxPrice !== null && !isNaN(maxPrice)) {
       filtered = filtered.filter(p => p.price <= Number(maxPrice));
+    }
+
+    if (outOfStockOnly) {
+      filtered = filtered.filter(p => (p.stock ?? 0) <= 0);
+    } else if (stockOnly) {
+      filtered = filtered.filter(p => (p.stock ?? 20) > 0);
     }
 
     if (query && query.trim()) {

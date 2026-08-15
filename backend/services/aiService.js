@@ -33,8 +33,7 @@ export const processAIChatRequest = async ({ message, messages = [], context = {
 
   // 3. Execute Controlled Backend Tool Operations based on Intent
   try {
-    if (intent === 'PRODUCT_SEARCH' || intent === 'PRODUCT_PRICE' || intent === 'PRODUCT_AVAILABILITY' || intent === 'PRODUCT_RECOMMENDATION') {
-      // Check for price range filters
+    if (intent === 'PRODUCT_CHEAPEST' || intent === 'PRODUCT_MOST_EXPENSIVE' || intent === 'PRODUCT_OUT_OF_STOCK' || intent === 'PRODUCT_IN_STOCK' || intent === 'PRODUCT_SEARCH' || intent === 'PRODUCT_PRICE' || intent === 'PRODUCT_AVAILABILITY' || intent === 'PRODUCT_RECOMMENDATION') {
       let maxPrice = null;
       let minPrice = null;
       
@@ -45,8 +44,25 @@ export const processAIChatRequest = async ({ message, messages = [], context = {
       if (aboveMatch) minPrice = parseInt(aboveMatch[1], 10);
 
       let sortBy = '';
+      let stockOnly = false;
+      let outOfStockOnly = false;
+
+      if (intent === 'PRODUCT_CHEAPEST') {
+        sortBy = 'price_asc';
+        stockOnly = true;
+      } else if (intent === 'PRODUCT_MOST_EXPENSIVE') {
+        sortBy = 'price_desc';
+        stockOnly = true;
+      } else if (intent === 'PRODUCT_OUT_OF_STOCK') {
+        outOfStockOnly = true;
+      } else if (intent === 'PRODUCT_IN_STOCK') {
+        stockOnly = true;
+      }
+
       if (lowerQuery.includes('cheap') || lowerQuery.includes('lowest price') || lowerQuery.includes('cheapest')) {
         sortBy = 'price_asc';
+      } else if (lowerQuery.includes('most expensive') || lowerQuery.includes('highest price')) {
+        sortBy = 'price_desc';
       } else if (lowerQuery.includes('best') || lowerQuery.includes('top rated') || lowerQuery.includes('highest rated')) {
         sortBy = 'rating';
       }
@@ -70,30 +86,33 @@ export const processAIChatRequest = async ({ message, messages = [], context = {
       }
 
       // Clean search term
-      let cleanSearchTerm = query
-        .replace(/show me|search for|do you have|any|available|under|below|cheap|cheapest|best|products|product|item|items|₹\d+|\d+|i want to see the|i want to see|give me|show|find|can i see|get me|from|all|of|these|categories|category/gi, '')
-        .trim();
-
-      let searchTerm = cleanSearchTerm;
-      const isBroadSearch = lowerQuery.match(/all products|all categories|from categories|from all|these categories|show products|list products|display products/i);
-      if (!searchTerm && !maxPrice && !minPrice && !category && !isBroadSearch) {
-        searchTerm = query.trim();
+      let searchTerm = '';
+      if (intent === 'PRODUCT_SEARCH' || intent === 'PRODUCT_PRICE' || intent === 'PRODUCT_AVAILABILITY') {
+        let clean = query
+          .replace(/show me|search for|do you have|any|available|under|below|above|less than|more than|cheap|cheapest|best|products|product|item|items|which|currently|out of stock|in stock|₹\d+|\d+/gi, '')
+          .trim();
+        if (clean.length >= 3 && !category) {
+          searchTerm = clean;
+        }
+      } else {
+        if (lowerQuery.includes('calculator')) searchTerm = 'calculator';
+        else if (lowerQuery.includes('kettle')) searchTerm = 'kettle';
+        else if (lowerQuery.includes('notebook')) searchTerm = 'notebook';
+        else if (lowerQuery.includes('pen')) searchTerm = 'pen';
+        else if (lowerQuery.includes('laptop')) searchTerm = 'laptop';
       }
 
-      if (lowerQuery.includes('exam')) searchTerm = 'exam';
-      else if (lowerQuery.includes('kettle')) searchTerm = 'kettle';
-      else if (lowerQuery.includes('calculator')) searchTerm = 'calculator';
-      else if (lowerQuery.includes('laptop')) searchTerm = 'laptop';
-      else if (lowerQuery.includes('pen')) searchTerm = 'pen';
-      else if (lowerQuery.includes('notebook')) searchTerm = 'notebook';
+      const limit = (intent === 'PRODUCT_CHEAPEST' || intent === 'PRODUCT_MOST_EXPENSIVE') ? 1 : 6;
 
       productsResult = await searchProducts({
         query: searchTerm,
         category,
         minPrice,
         maxPrice,
+        stockOnly,
+        outOfStockOnly,
         sortBy,
-        limit: 6
+        limit
       });
 
       toolData.products = productsResult;
@@ -321,9 +340,18 @@ export const processAIChatRequest = async ({ message, messages = [], context = {
 function classifyIntent(query, context, isLoggedIn) {
   const lower = query.replace(/[“”"'`]/g, '').trim().toLowerCase();
 
-  // Compound user status check (wallet + orders)
-  if (lower.includes('wallet') && (lower.includes('order') || lower.includes('track'))) {
-    return 'COMPOUND_USER_STATUS';
+  // Dedicated Product Intents (Cheapest, Out of Stock, Most Expensive, In Stock)
+  if (lower.match(/out of stock|unavailable products|items (?:are )?unavailable|products (?:are )?unavailable|zero stock|not available right now|marked as out of stock/i)) {
+    return 'PRODUCT_OUT_OF_STOCK';
+  }
+  if (lower.match(/which (?:is|product is|item is)? (?:the )?cheapest|what (?:is|'s) (?:the )?cheapest|show (?:me )?(?:the )?cheapest|least expensive|costs the least|cheapest product|cheapest item/i)) {
+    return 'PRODUCT_CHEAPEST';
+  }
+  if (lower.match(/most expensive|highest price|highest priced|costs the most/i)) {
+    return 'PRODUCT_MOST_EXPENSIVE';
+  }
+  if (lower.match(/products (?:are )?(?:currently )?in stock|products (?:are )?available|what can i buy right now|available products|items (?:in )?stock/i)) {
+    return 'PRODUCT_IN_STOCK';
   }
 
   // 1. Difference Question (Product vs Services)
@@ -521,6 +549,40 @@ async function generateDynamicFallbackResponse({ query, intent, toolData, user, 
 
   if (toolData.authRequired) {
     return `Hey ${userName}! 🔐 ${toolData.authMessage}`;
+  }
+
+  if (intent === 'PRODUCT_CHEAPEST') {
+    if (toolData.products && toolData.products.length > 0) {
+      const p = toolData.products[0];
+      return `The cheapest currently available product on CampusHub is **${p.title}** for **₹${p.price}**! Check out the product card below to add it to your cart.`;
+    } else {
+      return `There are currently no in-stock products available in the CampusHub database.`;
+    }
+  }
+
+  if (intent === 'PRODUCT_MOST_EXPENSIVE') {
+    if (toolData.products && toolData.products.length > 0) {
+      const p = toolData.products[0];
+      return `The highest-priced product currently available on CampusHub is **${p.title}** for **₹${p.price}**! Check out the details below.`;
+    } else {
+      return `There are currently no in-stock products available in the CampusHub database.`;
+    }
+  }
+
+  if (intent === 'PRODUCT_OUT_OF_STOCK') {
+    if (toolData.products && toolData.products.length > 0) {
+      return `Here are the products currently marked as out of stock on CampusHub:`;
+    } else {
+      return `Great news! No products are currently marked as out of stock in the CampusHub database.`;
+    }
+  }
+
+  if (intent === 'PRODUCT_IN_STOCK') {
+    if (toolData.products && toolData.products.length > 0) {
+      return `I found ${toolData.products.length} in-stock product(s) currently available in the CampusHub store! Check out the product cards below.`;
+    } else {
+      return `There are currently no in-stock products available in the CampusHub database.`;
+    }
   }
 
   if (intent === 'PRODUCT_SEARCH' || intent === 'FOLLOW_UP_CHEAPEST') {
