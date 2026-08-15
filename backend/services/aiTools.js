@@ -374,6 +374,37 @@ export const getCategories = async () => {
 };
 
 /**
+ * Fetch CampusHub Services
+ */
+export const getServices = async () => {
+  const baseServices = campusHubKnowledge.services.map(s => ({
+    id: s.id,
+    name: s.name,
+    price: s.price,
+    duration: s.duration,
+    description: s.description
+  }));
+
+  return [
+    ...baseServices,
+    {
+      id: 'printhub',
+      name: 'PrintHub Cloud Document Printing',
+      price: 'From ₹2/page',
+      duration: 'Dorm delivery',
+      description: 'Upload PDF/DOC documents for B&W (₹2/pg) or Color (₹10/pg) printing with optional Spiral Binding (₹49).'
+    },
+    {
+      id: 'marketplace',
+      name: 'Student Marketplace',
+      price: 'Peer Rates',
+      duration: 'Instant peer chat',
+      description: 'Trade pre-owned textbooks, lab coats, cycles, and hostel gear directly with dorm peers.'
+    }
+  ];
+};
+
+/**
  * Fetch Active Coupons
  */
 export const getCoupons = async () => {

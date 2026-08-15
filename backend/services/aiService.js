@@ -7,6 +7,7 @@ import {
   getUserProfile,
   getUserAddresses,
   getCategories,
+  getServices,
   getCoupons
 } from './aiTools.js';
 import { campusHubKnowledge } from './campusHubKnowledge.js';
@@ -196,8 +197,8 @@ export const processAIChatRequest = async ({ message, messages = [], context = {
         toolData.userAddresses = addresses;
       }
     }
-    else if (intent === 'SERVICE_INFO' || intent === 'PRINTING_INFO') {
-      toolData.services = campusHubKnowledge.services;
+    else if (intent === 'SERVICE_LIST' || intent === 'SERVICE_INFO' || intent === 'PRINTING_INFO') {
+      toolData.services = await getServices();
       toolData.printhub = campusHubKnowledge.printhub;
       if (lowerQuery.includes('print') || lowerQuery.includes('pdf') || lowerQuery.includes('document')) {
         action = { type: 'NAVIGATE', target: 'printhub' };
@@ -210,7 +211,7 @@ export const processAIChatRequest = async ({ message, messages = [], context = {
       action = { type: 'NAVIGATE', target: 'marketplace' };
     }
     else if (intent === 'PRODUCT_VS_SERVICES') {
-      toolData.services = campusHubKnowledge.services;
+      toolData.services = await getServices();
       toolData.printhub = campusHubKnowledge.printhub;
       toolData.marketplace = campusHubKnowledge.marketplace;
       toolData.categories = await getCategories();
@@ -449,24 +450,23 @@ function buildSystemPrompt({ user, toolData, intent, context }) {
   if (toolData.categories && toolData.categories.length > 0) {
     toolContextText += `Available Product Categories:\n`;
     toolData.categories.forEach(c => {
-      toolContextText += `- ${c.label || c.name} (${c.name || c.id}): ${c.description || 'Campus store items'}\n`;
+      toolContextText += `- ${c.label || c.name} (${c.itemsCount || 0} items available)\n`;
     });
-  } else {
-    toolContextText += `Available Product Categories:\n- Study & Stationery (Scientific Calculators, Notebooks, Registers, Pens, Highlighters, Lab Records)\n- Dorm & Hostel Essentials (Electric Kettles, Desk Lamps, Laundry Buckets, Bedsheets, Blankets, Locks)\n- Electronics & Accessories (Laptop Chargers, Power Banks, Earphones, USB Hubs, Mice, Laptop Stands)\n- Personal Care & Hygiene (Shampoos, Soaps, Towels, Skincare, Sanitizers)\n- Combos & Exam Kits (Exam Starter Pack, Freshers Kit, Night Owl Snack Box)\n- College Merchandise (Official Varsity Hoodies, Campus T-Shirts, Caps)\n`;
   }
 
-  if (toolData.services) {
-    toolContextText += `CampusHub Utility Services:\n${JSON.stringify(toolData.services, null, 2)}\n`;
-  } else {
-    toolContextText += `CampusHub Utility Services:\n- Laptop & Gadget Deep Cleaning (₹799, 45 mins): Internal dust removal, thermal paste application, keyboard sanitization.\n- Dorm Laundry Pickup & Fold (₹299, 5 kg): Wash, fabric softener, steam press, neatly folded.\n- Hostel Room Deep Sanitization (₹199, 30 mins): Floor scrubbing, desk clearing, trash removal, bathroom sanitization.\n`;
+  if (toolData.services && Array.isArray(toolData.services) && toolData.services.length > 0) {
+    toolContextText += `CampusHub Utility Services:\n`;
+    toolData.services.forEach(s => {
+      toolContextText += `- ${s.name}: ${s.description} (Price: ${typeof s.price === 'number' ? '₹' + s.price : s.price})\n`;
+    });
   }
 
   if (toolData.printhub) {
-    toolContextText += `PrintHub Printing Services:\n${JSON.stringify(toolData.printhub, null, 2)}\n`;
+    toolContextText += `PrintHub Printing Services:\n- B&W Printing: ₹2/page\n- Color Printing: ₹10/page\n- Spiral Binding: ₹49\n- Lamination: ₹30\n`;
   }
 
   if (toolData.marketplace) {
-    toolContextText += `Second-Hand Marketplace:\n${JSON.stringify(toolData.marketplace, null, 2)}\n`;
+    toolContextText += `Second-Hand Student Marketplace:\n- Peer-to-peer trading for textbooks, lab coats, cycles, and hostel furniture.\n`;
   }
 
   return `You are the official CampusHub Dynamic AI Assistant — a smart, friendly, college junior assisting students on campus.

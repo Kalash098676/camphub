@@ -105,14 +105,27 @@ export default function AIChatDrawer({
           productToAdd = dataObj.products.find(p => p.id === actionObj.productId || p._id === actionObj.productId) || dataObj.products[0];
         }
         if (!productToAdd) {
-          productToAdd = {
-            id: actionObj.productId,
-            title: actionObj.productTitle || 'CampusHub Item',
-            price: actionObj.price || 299,
-            image: 'https://images.unsplash.com/photo-1574634534894-89d7576c8259?auto=format&fit=crop&q=80&w=400'
-          };
+          // Search recent messages for matching product
+          for (let i = aiMessages.length - 1; i >= 0; i--) {
+            const m = aiMessages[i];
+            if (m.data && m.data.products && Array.isArray(m.data.products)) {
+              const found = m.data.products.find(p =>
+                (p.id && p.id === actionObj.productId) ||
+                (p._id && p._id === actionObj.productId) ||
+                (p.title && actionObj.productTitle && p.title.toLowerCase().includes(actionObj.productTitle.toLowerCase()))
+              );
+              if (found) {
+                productToAdd = found;
+                break;
+              }
+            }
+          }
         }
-        onAddToCart(productToAdd);
+        if (productToAdd) {
+          onAddToCart(productToAdd);
+        } else {
+          console.warn('Could not locate verified product to add to cart:', actionObj);
+        }
       }
     } else if (actionObj.type === 'NAVIGATE' && onNavigate) {
       onNavigate(actionObj.target);
@@ -146,6 +159,35 @@ export default function AIChatDrawer({
                     <ReactMarkdown>{msg.text}</ReactMarkdown>
                   ) : (
                     msg.text
+                  )}
+
+                  {/* Render Category Chips if returned by backend tool */}
+                  {msg.data && msg.data.categories && msg.data.categories.length > 0 && (
+                    <div className="ai-categories-container" style={{ marginTop: '10px', display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                      {msg.data.categories.map((cat, cIdx) => (
+                        <button
+                          key={cIdx}
+                          className="ai-category-chip"
+                          onClick={() => {
+                            setAiInput(`Show products in ${cat.label}`);
+                          }}
+                          style={{
+                            background: '#ffffff',
+                            color: '#0f172a',
+                            border: '1px solid #cbd5e1',
+                            borderRadius: '16px',
+                            padding: '4px 10px',
+                            fontSize: '0.75rem',
+                            fontWeight: 600,
+                            cursor: 'pointer',
+                            transition: 'all 0.2s ease',
+                            boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
+                          }}
+                        >
+                          {cat.label} ({cat.itemsCount || 0})
+                        </button>
+                      ))}
+                    </div>
                   )}
 
                   {/* Render Product Cards if returned by backend tool */}
