@@ -417,7 +417,7 @@ function classifyIntent(query, context, isLoggedIn) {
     return 'CATEGORY_SEARCH';
   }
 
-  if (lower.match(/print|printhub|pdf|photocopy|spiral|binding|lamination/i)) return 'PRINTING_INFO';
+  if (lower.match(/print|printhub|print section|pdf|photocopy|spiral|binding|lamination/i)) return 'PRINTING_INFO';
   if (lower.match(/laundry|cleaning|laptop clean|room clean|service|services/i)) return 'SERVICE_INFO';
   if (lower.match(/marketplace|second-hand|buy used|sell item|pre-owned/i)) return 'MARKETPLACE_INFO';
   if (lower.match(/coupon|coupons|discount|promo|offer|code/i)) return 'COUPON_INFO';
@@ -510,17 +510,17 @@ Student Context:
 ${toolContextText}
 
 Knowledge Guidelines:
-- PrintHub: B&W ₹2/pg, Color ₹10/pg, Spiral binding ₹49, Lamination ₹30. Fast delivery to hostel floor.
-- Services: Laptop Cleaning (₹799), Laundry Wash & Fold (₹299), Room Deep Cleaning (₹199).
+- PrintHub: B&W ₹2/pg, Color ₹10/pg, Spiral binding ₹49, Staple binding ₹10, Lamination ₹30. Fast 10-15 min delivery to hostel floor.
 - Delivery Time: 10-15 minutes campus runner delivery.
 
 STRICT INSTRUCTIONS:
 1. Always speak as a helpful campus assistant. Be friendly, natural, and provide COMPLETE, fully detailed answers.
 2. NEVER cut off your response mid-sentence or leave answers incomplete. Always complete all thoughts, explanations, and bullet points.
 3. Base your product details, prices, stock, categories, and services strictly on the verified data above.
-4. FORMATTING MANDATE: NEVER output multiple items, categories, or services horizontally on a single line separated by dots or bullets (e.g., NEVER write "• A • B • C").
-5. ALWAYS list items vertically on separate lines with a bullet ("•") or number ("1.") on its own line.
-6. If the user asks Hinglish questions (e.g., "Calculator kitne ka hai?"), reply naturally in clean Hinglish or English.`;
+4. PRINTHUB RULE: When asked about PrintHub or printing ("how Print section works", "printing rates", "how to print"), ONLY discuss document printing (B&W ₹2/pg, Color ₹10/pg, Spiral binding ₹49, paper size, duplex, document upload, hostel floor delivery). DO NOT mention Laptop Cleaning, Laundry, or Room Deep Cleaning!
+5. FORMATTING MANDATE: NEVER output multiple items, categories, or services horizontally on a single line separated by dots or bullets (e.g., NEVER write "• A • B • C").
+6. ALWAYS list items vertically on separate lines with a bullet ("•") or number ("1.") on its own line.
+7. If the user asks Hinglish questions (e.g., "Calculator kitne ka hai?"), reply naturally in clean Hinglish or English.`;
 }
 
 /**
