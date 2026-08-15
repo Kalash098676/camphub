@@ -117,13 +117,13 @@ export const processAIChatRequest = async ({ message, messages = [], context = {
 
       toolData.products = productsResult;
     } 
-    else if (intent === 'FOLLOW_UP_CHEAPEST' || intent === 'FOLLOW_UP_RECOMMEND') {
-      // User asking "Which one is cheapest?" referring to recent conversation products
+    else if (intent === 'FOLLOW_UP_CHEAPEST' || intent === 'FOLLOW_UP_RECOMMEND' || intent === 'FOLLOW_UP_PRICE' || intent === 'FOLLOW_UP_STOCK') {
+      // User asking follow-up question referring to recent conversation products
       if (conversationProducts.length > 0) {
         const sorted = [...conversationProducts].sort((a, b) => a.price - b.price);
-        productsResult = [sorted[0]];
+        productsResult = (intent === 'FOLLOW_UP_CHEAPEST') ? [sorted[0]] : [conversationProducts[0]];
         toolData.products = productsResult;
-        toolData.followUpTarget = sorted[0];
+        toolData.followUpTarget = productsResult[0];
       } else {
         productsResult = await searchProducts({ sortBy: 'price_asc', limit: 3 });
         toolData.products = productsResult;
@@ -381,6 +381,8 @@ function classifyIntent(query, context, isLoggedIn) {
 
   // Follow-ups & Cart actions
   if (lower.match(/which (?:one is|one's|one) (?:cheapest|cheaper|the cheapest|lowest price)/i)) return 'FOLLOW_UP_CHEAPEST';
+  if (lower.match(/how much (?:does it cost|is it|is that|cost)|what is (?:the )?price of (?:it|this|that)/i)) return 'FOLLOW_UP_PRICE';
+  if (lower.match(/is (?:it|this|that) in stock|is (?:it|this|that) available|stock status/i)) return 'FOLLOW_UP_STOCK';
   if (lower.match(/add (?:that|this|it|the cheapest|second|first|1st|2nd) (?:one|item)? to (?:my )?cart/i)) return 'CART_ADD';
   if (lower.match(/add .* to (?:my )?cart/i)) return 'CART_ADD';
   if (lower.match(/cart|check (?:my )?cart|show (?:my )?cart|view (?:my )?cart|open (?:my )?cart|what is in my cart|how to see cart|how (?:can|do) i check (?:my )?cart/i)) return 'CART_VIEW';
@@ -582,6 +584,21 @@ async function generateDynamicFallbackResponse({ query, intent, toolData, user, 
       return `I found ${toolData.products.length} in-stock product(s) currently available in the CampusHub store! Check out the product cards below.`;
     } else {
       return `There are currently no in-stock products available in the CampusHub database.`;
+    }
+  }
+
+  if (intent === 'FOLLOW_UP_PRICE') {
+    if (toolData.followUpTarget) {
+      const p = toolData.followUpTarget;
+      return `The price of **${p.title}** is **₹${p.price}**! Check out the product card below to add it to your cart.`;
+    }
+  }
+
+  if (intent === 'FOLLOW_UP_STOCK') {
+    if (toolData.followUpTarget) {
+      const p = toolData.followUpTarget;
+      const inStock = (p.stock ?? 20) > 0;
+      return `Yes, **${p.title}** is currently **${inStock ? 'IN STOCK' : 'OUT OF STOCK'}** (Available Stock: ${p.stock ?? 'Available'}).`;
     }
   }
 
