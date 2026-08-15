@@ -570,8 +570,13 @@ async function generateDynamicFallbackResponse({ query, intent, toolData, user, 
 
   if (intent === 'PRODUCT_CHEAPEST') {
     if (toolData.products && toolData.products.length > 0) {
-      const p = toolData.products[0];
-      return `The cheapest product is **${p.title}** for **₹${p.price}**.`;
+      let cheapestProd = toolData.products[0];
+      for (const p of toolData.products) {
+        if (typeof p.price === 'number' && p.price < cheapestProd.price) {
+          cheapestProd = p;
+        }
+      }
+      return `Cheapest product: ${cheapestProd.title} — ₹${cheapestProd.price}`;
     } else {
       return `No available products in store.`;
     }
@@ -579,8 +584,13 @@ async function generateDynamicFallbackResponse({ query, intent, toolData, user, 
 
   if (intent === 'PRODUCT_MOST_EXPENSIVE') {
     if (toolData.products && toolData.products.length > 0) {
-      const p = toolData.products[0];
-      return `The most expensive product is **${p.title}** for **₹${p.price}**.`;
+      let expProd = toolData.products[0];
+      for (const p of toolData.products) {
+        if (typeof p.price === 'number' && p.price > expProd.price) {
+          expProd = p;
+        }
+      }
+      return `Most expensive product: ${expProd.title} — ₹${expProd.price}`;
     } else {
       return `No available products in store.`;
     }
@@ -588,8 +598,8 @@ async function generateDynamicFallbackResponse({ query, intent, toolData, user, 
 
   if (intent === 'PRODUCT_OUT_OF_STOCK') {
     if (toolData.products && toolData.products.length > 0) {
-      const list = toolData.products.map(p => `• **${p.title}**`).join('\n');
-      return `The following product(s) are currently out of stock:\n\n${list}`;
+      const outNames = toolData.products.map(p => p.title).join(', ');
+      return `Out of stock: ${outNames}`;
     } else {
       return `Everything is available.`;
     }
@@ -872,8 +882,10 @@ function sanitizeAndCompleteResponse(text, intent = '', toolData = {}, user = nu
     }
   }
 
-  if (!/[.!?}\]"'`'’]$/.test(cleaned) && !cleaned.endsWith('**') && !cleaned.endsWith('__')) {
-    cleaned += '.';
+  if (intent !== 'PRODUCT_CHEAPEST' && intent !== 'PRODUCT_OUT_OF_STOCK' && intent !== 'PRODUCT_MOST_EXPENSIVE') {
+    if (!/[.!?}\]"'`'’]$/.test(cleaned) && !cleaned.endsWith('**') && !cleaned.endsWith('__')) {
+      cleaned += '.';
+    }
   }
 
   return cleaned;
