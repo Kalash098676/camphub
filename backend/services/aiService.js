@@ -571,26 +571,27 @@ async function generateDynamicFallbackResponse({ query, intent, toolData, user, 
   if (intent === 'PRODUCT_CHEAPEST') {
     if (toolData.products && toolData.products.length > 0) {
       const p = toolData.products[0];
-      return `The cheapest currently available product on CampusHub is **${p.title}** for **₹${p.price}**! Check out the product card below to add it to your cart.`;
+      return `The cheapest product is **${p.title}** for **₹${p.price}**.`;
     } else {
-      return `There are currently no in-stock products available in the CampusHub database.`;
+      return `No available products in store.`;
     }
   }
 
   if (intent === 'PRODUCT_MOST_EXPENSIVE') {
     if (toolData.products && toolData.products.length > 0) {
       const p = toolData.products[0];
-      return `The highest-priced product currently available on CampusHub is **${p.title}** for **₹${p.price}**! Check out the details below.`;
+      return `The most expensive product is **${p.title}** for **₹${p.price}**.`;
     } else {
-      return `There are currently no in-stock products available in the CampusHub database.`;
+      return `No available products in store.`;
     }
   }
 
   if (intent === 'PRODUCT_OUT_OF_STOCK') {
     if (toolData.products && toolData.products.length > 0) {
-      return `Here are the products currently marked as out of stock on CampusHub:`;
+      const list = toolData.products.map(p => `• **${p.title}**`).join('\n');
+      return `The following product(s) are currently out of stock:\n\n${list}`;
     } else {
-      return `Great news! No products are currently marked as out of stock in the CampusHub database.`;
+      return `Everything is available.`;
     }
   }
 
