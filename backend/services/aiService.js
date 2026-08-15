@@ -240,37 +240,57 @@ export const processAIChatRequest = async ({ message, messages = [], context = {
   if (apiKey && apiKey !== 'YOUR_GEMINI_API_KEY' && !apiKey.includes('your_actual_gemini')) {
     try {
       const systemInstruction = buildSystemPrompt({ user, toolData, intent, context });
-      
       const contents = buildGeminiContents(messages, query);
 
-      const model = process.env.GEMINI_MODEL || 'gemini-3.6-flash';
-      const geminiResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents,
-          systemInstruction: { parts: [{ text: systemInstruction }] },
-          generationConfig: {
-            maxOutputTokens: 1000,
-            temperature: 0.6
+      const candidateModels = [
+        process.env.GEMINI_MODEL,
+        'gemini-1.5-flash',
+        'gemini-2.0-flash',
+        'gemini-1.5-pro'
+      ].filter(Boolean);
+
+      for (const model of candidateModels) {
+        if (model === 'gemini-3.6-flash') continue; // skip invalid legacy placeholder
+        try {
+          const geminiResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contents,
+              systemInstruction: { parts: [{ text: systemInstruction }] },
+              generationConfig: {
+                maxOutputTokens: 1200,
+                temperature: 0.5
+              },
+              safetySettings: [
+                { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
+                { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
+                { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" },
+                { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" }
+              ]
+            })
+          });
+
+          const geminiData = await geminiResponse.json();
+
+          if (geminiData.candidates && geminiData.candidates[0] && geminiData.candidates[0].content && geminiData.candidates[0].content.parts[0]) {
+            const rawText = geminiData.candidates[0].content.parts[0].text;
+            if (rawText && !isResponseTruncated(rawText)) {
+              finalResponseText = rawText;
+              break;
+            }
           }
-        })
-      });
-
-      const geminiData = await geminiResponse.json();
-
-      if (geminiData.candidates && geminiData.candidates[0] && geminiData.candidates[0].content && geminiData.candidates[0].content.parts[0]) {
-        finalResponseText = geminiData.candidates[0].content.parts[0].text;
-      } else {
-        console.warn('Gemini API structure warning:', geminiData);
+        } catch (mErr) {
+          console.warn(`Gemini model ${model} execution notice:`, mErr.message);
+        }
       }
     } catch (err) {
       console.warn('Gemini API call failed, falling back to dynamic tool response generator:', err.message);
     }
   }
 
-  // 5. Dynamic Fallback Text Generator (If Gemini text is empty or offline)
-  if (!finalResponseText) {
+  // 5. Dynamic Fallback Text Generator (If Gemini text is empty, offline, or truncated)
+  if (!finalResponseText || isResponseTruncated(finalResponseText)) {
     finalResponseText = generateDynamicFallbackResponse({ query, intent, toolData, user, action });
   }
 
@@ -638,3 +658,32 @@ You can ask me to search for any item or category above!`;
 
   return `Hey ${userName}! 👋 I can help you search live products, track orders, check Campus Pay wallet balance, calculate printing costs, or book dorm services. What do you need today?`;
 }
+
+/**
+ * Helper to validate response completeness and detect mid-sentence truncation
+ */
+function isResponseTruncated(text) {
+  if (!text || typeof text !== 'string') return true;
+  const trimmed = text.trim();
+  if (trimmed.length < 30) return true;
+
+  // Check abrupt sentence termination markers
+  if (/[([{:\-,—]$/.test(trimmed)) return true;
+  if (/\(in \d*$/i.test(trimmed)) return true;
+
+  const lines = trimmed.split('\n');
+  const lastLine = lines[lines.length - 1].trim();
+
+  // Mismatched parentheses or brackets
+  const openParens = (lastLine.match(/\(/g) || []).length;
+  const closeParens = (lastLine.match(/\)/g) || []).length;
+  if (openParens > closeParens) return true;
+
+  // Unfinished line lacking punctuation or standard markdown ending
+  if (!/[.!?}\]"`'’]$/.test(lastLine) && !lastLine.endsWith('**') && !lastLine.endsWith('__')) {
+    return true;
+  }
+
+  return false;
+}
+
