@@ -250,6 +250,73 @@ export default function AIChatDrawer({
                       ))}
                     </div>
                   )}
+
+                  {/* Render Services List if returned by backend tool */}
+                  {msg.data && msg.data.services && msg.data.services.length > 0 && (
+                    <div className="ai-services-container" style={{ marginTop: '10px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      {msg.data.services.map((srv, sIdx) => (
+                        <div
+                          key={sIdx}
+                          className="ai-service-card"
+                          style={{
+                            background: '#ffffff',
+                            color: '#0f172a',
+                            border: '1px solid #cbd5e1',
+                            borderRadius: '8px',
+                            padding: '8px 12px',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '4px',
+                            boxShadow: '0 1px 2px rgba(0,0,0,0.03)'
+                          }}
+                        >
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#0f172a' }}>{srv.name}</span>
+                            <span style={{ fontSize: '0.7rem', fontWeight: 700, color: '#16a34a', background: '#dcfce7', padding: '2px 6px', borderRadius: '4px' }}>
+                              {typeof srv.price === 'number' ? `₹${srv.price}` : srv.price}
+                            </span>
+                          </div>
+                          {srv.description && (
+                            <span style={{ fontSize: '0.75rem', color: '#475569' }}>{srv.description}</span>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Render Active Orders if returned by backend tool */}
+                  {msg.data && msg.data.orders && msg.data.orders.length > 0 && (
+                    <div className="ai-orders-container" style={{ marginTop: '10px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      {msg.data.orders.map((ord, oIdx) => (
+                        <div
+                          key={oIdx}
+                          className="ai-order-card"
+                          style={{
+                            background: '#eff6ff',
+                            border: '1px solid #bfdbfe',
+                            borderRadius: '8px',
+                            padding: '8px 12px',
+                            display: 'flex',
+                            justify: 'space-between',
+                            alignItems: 'center'
+                          }}
+                        >
+                          <div>
+                            <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#1e3a8a' }}>Order #{ord.orderId || ord._id}</div>
+                            <div style={{ fontSize: '0.72rem', color: '#3b82f6' }}>Total: ₹{ord.totalAmount} • Status: {ord.orderStatus || 'Processing'}</div>
+                          </div>
+                          {onNavigate && (
+                            <button
+                              onClick={() => onNavigate('orders')}
+                              style={{ background: '#2563eb', color: '#fff', border: 'none', padding: '4px 8px', borderRadius: '6px', fontSize: '0.7rem', fontWeight: 700, cursor: 'pointer' }}
+                            >
+                              Track
+                            </button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
             ))}

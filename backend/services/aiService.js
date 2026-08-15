@@ -391,7 +391,7 @@ function classifyIntent(query, context, isLoggedIn) {
   if (lower.match(/how (?:can|do|to) (?:i |we )?(?:place (?:an )?order|order|buy|purchase)|order(?:ing)? process|process .* order|tell me how can i order/i)) {
     return 'HOW_TO_ORDER';
   }
-  if (lower.match(/my orders|latest order|track (?:my )?order|track|order status|where is my order|what did i order|order history|how (?:can|do|to) i track (?:my )?order/i)) return 'ORDER_STATUS';
+  if (lower.match(/my orders|recent order|recent orders|latest order|track (?:my )?order|track|order status|where is my order|what did i order|order history|how (?:can|do|to) i track (?:my )?order/i)) return 'ORDER_STATUS';
   if (lower.match(/wallet|balance|campus pay|my money|transactions|cashback|wallet balance/i)) return 'WALLET_BALANCE';
   if (lower.match(/my profile|my student id|my department|my room number|my room no|my hostel block|who am i|profile/i)) return 'PROFILE_INFO';
   if (lower.match(/address|delivery location|saved address/i)) return 'ADDRESS_INFO';
@@ -517,8 +517,9 @@ STRICT INSTRUCTIONS:
 1. Always speak as a helpful campus assistant. Be friendly, natural, and provide COMPLETE, fully detailed answers.
 2. NEVER cut off your response mid-sentence or leave answers incomplete. Always complete all thoughts, explanations, and bullet points.
 3. Base your product details, prices, stock, categories, and services strictly on the verified data above.
-4. When asked about product categories or differences between products and services, list ALL items/points clearly in formatted markdown bullet points with emojis.
-5. If the user asks Hinglish questions (e.g., "Calculator kitne ka hai?"), reply naturally in clean Hinglish or English.`;
+4. FORMATTING MANDATE: NEVER output multiple items, categories, or services horizontally on a single line separated by dots or bullets (e.g., NEVER write "• A • B • C").
+5. ALWAYS list items vertically on separate lines with a bullet ("•") or number ("1.") on its own line.
+6. If the user asks Hinglish questions (e.g., "Calculator kitne ka hai?"), reply naturally in clean Hinglish or English.`;
 }
 
 /**
@@ -789,6 +790,11 @@ function sanitizeAndCompleteResponse(text, intent = '', toolData = {}, user = nu
   if (!text || typeof text !== 'string') return '';
 
   let cleaned = text.trim();
+
+  // Normalize any inline bullet point separators (" • ") into clean vertical newlines ("\n• ")
+  if (cleaned.includes(' • ')) {
+    cleaned = cleaned.replace(/\s*•\s*/g, '\n• ').trim();
+  }
 
   // 1. Fix known truncated endings like "in 10-" or "in 10-15"
   if (/in 10-$/i.test(cleaned)) {
