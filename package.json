@@ -1,0 +1,13 @@
+{
+  "name": "campushub-monorepo",
+  "private": true,
+  "version": "1.0.0",
+  "description": "CampusHub Quick E-Commerce Monorepo Root",
+  "scripts": {
+    "dev": "npm run dev --prefix frontend",
+    "dev:backend": "npm run dev --prefix backend",
+    "build": "cd frontend && npm install && npm run build",
+    "lint": "npm run lint --prefix frontend",
+    "test": "cd frontend && npm install && npm run lint && npm run build"
+  }
+}

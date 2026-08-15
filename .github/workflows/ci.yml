@@ -1,0 +1,33 @@
+name: CI Build & Test
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Frontend Install, Lint & Build
+        run: |
+          cd frontend
+          npm install
+          npm run lint
+          npm run build
+
+      - name: Backend Syntax Check
+        run: |
+          cd backend
+          npm install
+          node --check index.js
