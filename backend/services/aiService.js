@@ -275,7 +275,7 @@ export const processAIChatRequest = async ({ message, messages = [], context = {
 
           if (geminiData.candidates && geminiData.candidates[0] && geminiData.candidates[0].content && geminiData.candidates[0].content.parts[0]) {
             const rawText = geminiData.candidates[0].content.parts[0].text;
-            if (rawText && !isResponseTruncated(rawText)) {
+            if (rawText && !isResponseTruncated(rawText, intent)) {
               finalResponseText = rawText;
               break;
             }
@@ -290,7 +290,7 @@ export const processAIChatRequest = async ({ message, messages = [], context = {
   }
 
   // 5. Dynamic Fallback Text Generator (If Gemini text is empty, offline, or truncated)
-  if (!finalResponseText || isResponseTruncated(finalResponseText)) {
+  if (!finalResponseText || isResponseTruncated(finalResponseText, intent)) {
     finalResponseText = generateDynamicFallbackResponse({ query, intent, toolData, user, action });
   }
 
@@ -660,12 +660,12 @@ You can ask me to search for any item or category above!`;
 }
 
 /**
- * Helper to validate response completeness and detect mid-sentence truncation
+ * Helper to validate response completeness and detect mid-sentence or section truncation
  */
-function isResponseTruncated(text) {
+function isResponseTruncated(text, intent = '') {
   if (!text || typeof text !== 'string') return true;
   const trimmed = text.trim();
-  if (trimmed.length < 30) return true;
+  if (trimmed.length < 40) return true;
 
   // Check abrupt sentence termination markers
   if (/[([{:\-,—]$/.test(trimmed)) return true;
@@ -674,10 +674,28 @@ function isResponseTruncated(text) {
   const lines = trimmed.split('\n');
   const lastLine = lines[lines.length - 1].trim();
 
-  // Mismatched parentheses or brackets
-  const openParens = (lastLine.match(/\(/g) || []).length;
-  const closeParens = (lastLine.match(/\)/g) || []).length;
+  // Mismatched parentheses or brackets across response
+  const openParens = (trimmed.match(/\(/g) || []).length;
+  const closeParens = (trimmed.match(/\)/g) || []).length;
   if (openParens > closeParens) return true;
+
+  // Intent-specific structural completeness validation
+  if (intent === 'PRODUCT_VS_SERVICES') {
+    const lower = trimmed.toLowerCase();
+    const hasProductsPart = lower.includes('product') || lower.includes('buy') || lower.includes('physical');
+    const hasServicesPart = lower.includes('service') || lower.includes('printhub') || lower.includes('laundry') || lower.includes('clean');
+    if (!hasProductsPart || !hasServicesPart) {
+      return true; // Force complete structured answer!
+    }
+  }
+
+  if (intent === 'CATEGORY_SEARCH') {
+    const lower = trimmed.toLowerCase();
+    const catMatches = (lower.match(/stationery|study|dorm|hostel|electronic|personal|combo|merchandise|category|categories/g) || []).length;
+    if (catMatches < 2) {
+      return true; // Force complete category list!
+    }
+  }
 
   // Unfinished line lacking punctuation or standard markdown ending
   if (!/[.!?}\]"`'’]$/.test(lastLine) && !lastLine.endsWith('**') && !lastLine.endsWith('__')) {
