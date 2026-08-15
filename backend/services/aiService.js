@@ -402,7 +402,7 @@ function classifyIntent(query, context, isLoggedIn) {
   if (lower.match(/cart|check (?:my )?cart|show (?:my )?cart|view (?:my )?cart|open (?:my )?cart|what is in my cart|how to see cart|how (?:can|do) i check (?:my )?cart/i)) return 'CART_VIEW';
 
   // Ordering & Workflows
-  if (lower.match(/how (?:can|do|to) (?:i |we )?(?:place (?:an )?order|order|buy|purchase)|order(?:ing)? process|process .* order|tell me how can i order/i)) {
+  if (lower.match(/how (?:can|do|to|should|would) (?:i|we)? (?:place|make|put|create|do) (?:an|my|the)? ?(?:order|purchase)|how (?:can|do|to) (?:i|we)? order|how (?:can|do|to) (?:i|we)? buy|how to order|how to place order|order(?:ing)? process|process .* order|tell me how (?:can|do|to) i order/i) || lower.includes('how to place an order') || lower.includes('how to place my order') || lower.includes('how can i place my order') || lower.includes('how can i place an order') || lower.includes('how can i order')) {
     return 'HOW_TO_ORDER';
   }
   if (lower.match(/my orders|recent order|recent orders|latest order|track (?:my )?order|track|order status|where is my order|what did i order|order history|how (?:can|do|to) i track (?:my )?order/i)) return 'ORDER_STATUS';
