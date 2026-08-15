@@ -102,7 +102,7 @@ export const processAIChatRequest = async ({ message, messages = [], context = {
         else if (lowerQuery.includes('laptop')) searchTerm = 'laptop';
       }
 
-      const limit = (intent === 'PRODUCT_CHEAPEST' || intent === 'PRODUCT_MOST_EXPENSIVE') ? 1 : 6;
+      const limit = (intent === 'PRODUCT_CHEAPEST' || intent === 'PRODUCT_MOST_EXPENSIVE') ? 1 : (lowerQuery.includes('all categories') || lowerQuery.includes('all category') || lowerQuery.includes('from all') || lowerQuery.includes('show all')) ? 18 : 6;
 
       productsResult = await searchProducts({
         query: searchTerm,
