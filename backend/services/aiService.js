@@ -674,12 +674,22 @@ async function generateDynamicFallbackResponse({ query, intent, toolData, user, 
   }
 
   if (intent === 'HOW_TO_ORDER') {
-    return `Hey ${userName}! 🛒 Here is how you can place an order on CampusHub:
+    return `Hey ${userName}! 🛒 Here is the complete step-by-step process to place an order on CampusHub:
 
-1️⃣ Browse & Select: Explore store categories or ask me for any product (e.g., calculators, notebooks, snacks).
-2️⃣ Add to Cart: Click '+ Add to Cart' on your chosen item or ask me to add it directly.
-3️⃣ Checkout: Open your Cart drawer, select your hostel room delivery address, choose payment (COD, UPI, or Campus Pay Wallet), and place your order!
-4️⃣ Fast Delivery: Our campus runner delivers it straight to your hostel room floor in 10-15 minutes!`;
+1️⃣ **Browse & Select Products**:
+Explore store categories (stationery, electronics, hostel supplies, snacks) or ask me for any product.
+
+2️⃣ **Add Items to Cart**:
+Click '+ Add to Cart' on your chosen item or ask me to add it directly to your cart.
+
+3️⃣ **Open Cart & Select Hostel Address**:
+Click the Cart icon in the top navigation bar and select your hostel block & room number.
+
+4️⃣ **Select Payment Method**:
+Pay using Campus Pay Wallet (instant 1-click), UPI (Google Pay / PhonePe / Paytm), or Cash on Delivery (COD).
+
+5️⃣ **Track Fast 10-Minute Delivery**:
+Place your order! Our campus runner delivers your items straight to your hostel room floor in 10-15 minutes!`;
   }
 
   if (intent === 'PAYMENT_INFO') {
