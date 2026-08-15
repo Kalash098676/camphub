@@ -608,7 +608,12 @@ async function generateDynamicFallbackResponse({ query, intent, toolData, user, 
       const topP = toolData.products[0];
       return `Hey ${userName}! 🎒 I found ${pCount} matching items in the CampusHub store! The top result is "${topP.title}" for ₹${topP.price}. Check out the details below!`;
     } else {
-      return `Sorry ${userName}! 🎒 The product "${query}" is not available in any category in our CampusHub database right now. Try searching for available items like calculators, notebooks, pens, electric kettles, or laptop stands!`;
+      let cleanTerm = query.replace(/which|what|where|show|me|the|cheapest|available|currently|products|product|items|item|in stock|out of stock|is|are|do|you|have|any|under|below|above|₹\d+|\d+/gi, '').trim();
+      if (cleanTerm.length > 2) {
+        return `Sorry ${userName}! 🎒 The item "${cleanTerm}" is not available in our CampusHub database right now. Try searching for available items like calculators, notebooks, pens, electric kettles, or laptop stands!`;
+      } else {
+        return `Sorry ${userName}! 🎒 I couldn't find any matching items in our CampusHub database right now. Try searching for available items like calculators, notebooks, pens, electric kettles, or laptop stands!`;
+      }
     }
   }
 
@@ -763,42 +768,16 @@ Want me to show products from any of these categories?`;
 function isResponseTruncated(text, intent = '') {
   if (!text || typeof text !== 'string') return true;
   const trimmed = text.trim();
-  if (trimmed.length < 40) return true;
+  if (trimmed.length < 15) return true;
 
-  // Check abrupt sentence termination markers
+  // Check abrupt sentence termination markers (dangling hyphens or connectors)
   if (/[-([{:,\u2014]$/.test(trimmed)) return true;
-  if (/in 10-$/i.test(trimmed) || /in 10-15$/i.test(trimmed)) return true;
-
-  const lines = trimmed.split('\n');
-  const lastLine = lines[lines.length - 1].trim();
+  if (/\b(?:and|or|the|with|for|a|an|is|are|of|to|in 10-|in 10-15)\s*$/i.test(trimmed)) return true;
 
   // Mismatched parentheses or brackets across response
   const openParens = (trimmed.match(/\(/g) || []).length;
   const closeParens = (trimmed.match(/\)/g) || []).length;
-  if (openParens > closeParens) return true;
-
-  // Intent-specific structural completeness validation
-  if (intent === 'PRODUCT_VS_SERVICES') {
-    const lower = trimmed.toLowerCase();
-    const hasProductsPart = lower.includes('product') || lower.includes('buy') || lower.includes('physical');
-    const hasServicesPart = lower.includes('service') || lower.includes('printhub') || lower.includes('laundry') || lower.includes('clean');
-    if (!hasProductsPart || !hasServicesPart) {
-      return true; // Force complete structured answer!
-    }
-  }
-
-  if (intent === 'CATEGORY_SEARCH') {
-    const lower = trimmed.toLowerCase();
-    const catMatches = (lower.match(/stationery|study|dorm|hostel|electronic|personal|combo|merchandise|category|categories/g) || []).length;
-    if (catMatches < 2) {
-      return true; // Force complete category list!
-    }
-  }
-
-  // Unfinished line lacking punctuation or standard markdown ending
-  if (!/[.!?}\]"`'’]$/.test(lastLine) && !lastLine.endsWith('**') && !lastLine.endsWith('__')) {
-    return true;
-  }
+  if (openParens > closeParens + 1) return true;
 
   return false;
 }
