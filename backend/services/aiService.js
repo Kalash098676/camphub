@@ -325,18 +325,29 @@ function classifyIntent(query, context, isLoggedIn) {
     return 'COMPOUND_USER_STATUS';
   }
 
-  // Product comparison & Rating queries
-  if (lower.match(/highest rating|highest rated|top rated|best product|best rated|top product|most popular/i)) {
-    return 'TOP_RATED_PRODUCT';
-  }
-
-  if (lower.match(/difference between.*product.*service|product vs service|difference.*service/i)) {
+  // 1. Difference Question (Product vs Services)
+  if (lower.match(/difference between.*product.*service|product vs service|difference.*service|how do (?:products|services) differ/i)) {
     return 'PRODUCT_VS_SERVICES';
   }
 
-  // General Website overview check (prioritize "what is campushub" over specific service keyword)
-  if (lower.match(/what is campushub|about campushub|what can i do on this website|how does campushub work|how to register|how to signup/i)) {
+  // 2. General Website overview ("tell me everything i can do", "about campushub", "what can i do on campushub")
+  if (lower.match(/what is campushub|about campushub|what can i do|everything i can do|how does campushub work|tell me about campushub/i)) {
     return 'GENERAL_WEBSITE';
+  }
+
+  // 3. Service Query Intent ("what services are available", "what can i book")
+  if (lower.match(/what services|available services|services available|service available|services do you|what can i book|book service|tell me about your services|campus services/i)) {
+    return 'SERVICE_LIST';
+  }
+
+  // 4. Product Category Query Intent ("what categories are available", "what product categories do you have", "which categories can i browse")
+  if (lower.match(/what (?:product )?categories|categories available|available categories|category available|types of products|show me all categories|which categories|list categories/i)) {
+    return 'PRODUCT_CATEGORY_LIST';
+  }
+
+  // Product comparison & Rating queries
+  if (lower.match(/highest rating|highest rated|top rated|best product|best rated|top product|most popular/i)) {
+    return 'TOP_RATED_PRODUCT';
   }
 
   // Follow-ups & Cart actions
@@ -620,8 +631,16 @@ function generateDynamicFallbackResponse({ query, intent, toolData, user, action
     }
   }
 
-  if (intent === 'SERVICE_INFO' || intent === 'PRINTING_INFO') {
-    return `Hey ${userName}! 🖨️ PrintHub costs ₹2/page (B&W) and ₹10/page (Color) with spiral binding (₹49). We also offer Laptop Cleaning (₹799), Laundry (₹299), and Room Cleaning (₹199) delivered straight to your dorm room floor!`;
+  if (intent === 'SERVICE_LIST' || intent === 'SERVICE_INFO' || intent === 'PRINTING_INFO') {
+    return `Here are the CampusHub services currently available:
+
+• **🖨️ PrintHub Cloud Printing**: Upload PDF/DOC documents for B&W (₹2/pg) or Color (₹10/pg) printing with optional Spiral Binding (₹49), delivered to your dorm room floor.
+• **💻 Laptop & Gadget Deep Cleaning**: Internal dust removal, thermal paste re-application, and keyboard sanitization (₹799).
+• **🧺 Dorm Laundry Pickup & Fold**: 5kg laundry wash, fabric softening, steam press, and neat fold (₹299).
+• **🧹 Hostel Room Deep Sanitization**: Floor scrubbing, desk clearing, and bathroom sanitization (₹199).
+• **🔄 Student Marketplace**: Trade pre-owned textbooks, lab coats, cycles, and hostel gear directly with dorm peers.
+
+You can ask me about pricing or how to book any of these services!`;
   }
 
   if (intent === 'MARKETPLACE_INFO') {
@@ -635,17 +654,26 @@ function generateDynamicFallbackResponse({ query, intent, toolData, user, action
     }
   }
 
-  if (intent === 'CATEGORY_SEARCH') {
-    return `Hey ${userName}! 🛍️ On **CampusHub**, we've got everything you need to survive and thrive on campus! Here are all the product categories available:
+  if (intent === 'CATEGORY_SEARCH' || intent === 'PRODUCT_CATEGORY_LIST') {
+    if (toolData.categories && toolData.categories.length > 0) {
+      const catListText = toolData.categories.map(c => `• **${c.label}** (${c.itemsCount || 0} items available)`).join('\n');
+      return `Here are the product categories currently available on CampusHub:
 
-1️⃣ **Study & Stationery**: Scientific calculators, Classmate notebooks, Trimax pens, registers, highlighters, index cards & lab record books.
-2️⃣ **Dorm & Hostel Essentials**: Electric kettles, desk lamps, laundry buckets, bedsheets, blankets, room locks & organizers.
-3️⃣ **Electronics & Accessories**: Laptop chargers, power banks, wireless earphones, USB hubs, keyboards, mice & laptop stands.
-4️⃣ **Personal Care & Hygiene**: Shampoos, soaps, toothpastes, towels, face washes & room fresheners.
-5️⃣ **Combos & Exam Kits**: Curated savings bundles like Exam Starter Pack, Night Owl Snack Box & Freshers Kit.
-6️⃣ **College Merchandise**: Official varsity hoodies, campus t-shirts, caps & tote bags.
+${catListText}
 
-You can ask me to search for any item or category above!`;
+Want me to show products from any of these categories?`;
+    }
+    return `Here are the product categories currently available on CampusHub:
+
+• **📚 Study Essentials** (Calculators, Notebooks, Registers, Pens, Highlighters)
+• **💻 Electronics & Accessories** (Laptop Chargers, Power Banks, Earphones, Laptop Stands)
+• **🏠 Hostel Essentials** (Desk Lamps, Laundry Buckets, Bedsheets, Room Locks)
+• **🧴 Personal Care** (Shampoos, Soaps, Towels, Skincare, Sanitizers)
+• **🍽 Kitchen & Utility** (Electric Kettles, Lunch Boxes, Mugs)
+• **🎓 College Merchandise** (Official Varsity Hoodies, Campus T-Shirts, Caps)
+• **📦 Student Combo Packs** (Exam Starter Packs, Night Owl Snack Kits)
+
+Want me to show products from any of these categories?`;
   }
 
   const lq = query.toLowerCase();

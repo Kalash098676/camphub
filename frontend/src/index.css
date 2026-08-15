@@ -3223,10 +3223,27 @@ img {
   border-radius: 14px;
   font-size: 0.84rem;
   line-height: 1.5;
-  white-space: pre-wrap;
+  white-space: normal;
   word-break: break-word;
   overflow-wrap: anywhere;
   box-sizing: border-box;
+}
+
+.chat-bubble p {
+  margin: 0 0 0.5rem 0;
+}
+.chat-bubble p:last-child {
+  margin-bottom: 0;
+}
+.chat-bubble ul, .chat-bubble ol {
+  margin: 0.35rem 0 0.5rem 1.2rem;
+  padding: 0;
+}
+.chat-bubble li {
+  margin-bottom: 0.3rem;
+}
+.chat-bubble strong {
+  font-weight: 700;
 }
 
 .chat-message.ai .chat-bubble {

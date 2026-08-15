@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import ReactMarkdown from 'react-markdown';
 import { API_BASE } from '../../config/api';
 
 export default function AIChatDrawer({
@@ -15,6 +16,15 @@ export default function AIChatDrawer({
   cart = []
 }) {
   const [isTyping, setIsTyping] = useState(false);
+  const messagesEndRef = useRef(null);
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  useEffect(() => {
+    scrollToBottom();
+  }, [aiMessages, isTyping, aiChatOpen]);
 
   const handleSend = async (e) => {
     e.preventDefault();
@@ -132,7 +142,11 @@ export default function AIChatDrawer({
             {aiMessages.map((msg, idx) => (
               <div key={idx} className={`chat-message ${msg.sender}`}>
                 <div className="chat-bubble">
-                  {msg.text}
+                  {msg.sender === 'ai' ? (
+                    <ReactMarkdown>{msg.text}</ReactMarkdown>
+                  ) : (
+                    msg.text
+                  )}
 
                   {/* Render Product Cards if returned by backend tool */}
                   {msg.data && msg.data.products && msg.data.products.length > 0 && (
@@ -208,6 +222,7 @@ export default function AIChatDrawer({
                 </div>
               </div>
             )}
+            <div ref={messagesEndRef} />
           </div>
 
           {/* Footer Form */}
