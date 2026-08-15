@@ -209,6 +209,12 @@ export const processAIChatRequest = async ({ message, messages = [], context = {
       toolData.marketplace = campusHubKnowledge.marketplace;
       action = { type: 'NAVIGATE', target: 'marketplace' };
     }
+    else if (intent === 'PRODUCT_VS_SERVICES') {
+      toolData.services = campusHubKnowledge.services;
+      toolData.printhub = campusHubKnowledge.printhub;
+      toolData.marketplace = campusHubKnowledge.marketplace;
+      toolData.categories = await getCategories();
+    }
     else if (intent === 'COUPON_INFO') {
       toolData.coupons = await getCoupons();
     }
@@ -245,7 +251,7 @@ export const processAIChatRequest = async ({ message, messages = [], context = {
           contents,
           systemInstruction: { parts: [{ text: systemInstruction }] },
           generationConfig: {
-            maxOutputTokens: 400,
+            maxOutputTokens: 1000,
             temperature: 0.6
           }
         })
@@ -406,8 +412,27 @@ function buildSystemPrompt({ user, toolData, intent, context }) {
     toolContextText += `User Profile Specs: ${JSON.stringify(toolData.userProfile)}\n`;
   }
 
-  if (toolData.authRequired) {
-    toolContextText += `SECURITY NOTICE: User is currently GUEST. ${toolData.authMessage}\n`;
+  if (toolData.categories && toolData.categories.length > 0) {
+    toolContextText += `Available Product Categories:\n`;
+    toolData.categories.forEach(c => {
+      toolContextText += `- ${c.label || c.name} (${c.name || c.id}): ${c.description || 'Campus store items'}\n`;
+    });
+  } else {
+    toolContextText += `Available Product Categories:\n- Study & Stationery (Scientific Calculators, Notebooks, Registers, Pens, Highlighters, Lab Records)\n- Dorm & Hostel Essentials (Electric Kettles, Desk Lamps, Laundry Buckets, Bedsheets, Blankets, Locks)\n- Electronics & Accessories (Laptop Chargers, Power Banks, Earphones, USB Hubs, Mice, Laptop Stands)\n- Personal Care & Hygiene (Shampoos, Soaps, Towels, Skincare, Sanitizers)\n- Combos & Exam Kits (Exam Starter Pack, Freshers Kit, Night Owl Snack Box)\n- College Merchandise (Official Varsity Hoodies, Campus T-Shirts, Caps)\n`;
+  }
+
+  if (toolData.services) {
+    toolContextText += `CampusHub Utility Services:\n${JSON.stringify(toolData.services, null, 2)}\n`;
+  } else {
+    toolContextText += `CampusHub Utility Services:\n- Laptop & Gadget Deep Cleaning (₹799, 45 mins): Internal dust removal, thermal paste application, keyboard sanitization.\n- Dorm Laundry Pickup & Fold (₹299, 5 kg): Wash, fabric softener, steam press, neatly folded.\n- Hostel Room Deep Sanitization (₹199, 30 mins): Floor scrubbing, desk clearing, trash removal, bathroom sanitization.\n`;
+  }
+
+  if (toolData.printhub) {
+    toolContextText += `PrintHub Printing Services:\n${JSON.stringify(toolData.printhub, null, 2)}\n`;
+  }
+
+  if (toolData.marketplace) {
+    toolContextText += `Second-Hand Marketplace:\n${JSON.stringify(toolData.marketplace, null, 2)}\n`;
   }
 
   return `You are the official CampusHub Dynamic AI Assistant — a smart, friendly, college junior assisting students on campus.
@@ -425,10 +450,10 @@ Knowledge Guidelines:
 - Delivery Time: 10-15 minutes campus runner delivery.
 
 STRICT INSTRUCTIONS:
-1. Always speak as a helpful campus assistant. Be concise, friendly, and natural.
-2. NEVER invent products, prices, stock, or order details. Base your answer strictly on the Live Products and Verified Data above.
-3. If user is guest and asks for private data (orders/wallet/profile), politely tell them to log in first.
-4. If products are returned, introduce them clearly so the student can inspect the product cards rendered below.
+1. Always speak as a helpful campus assistant. Be friendly, natural, and provide COMPLETE, fully detailed answers.
+2. NEVER cut off your response mid-sentence or leave answers incomplete. Always complete all thoughts, explanations, and bullet points.
+3. Base your product details, prices, stock, categories, and services strictly on the verified data above.
+4. When asked about product categories or differences between products and services, list ALL items/points clearly in formatted markdown bullet points with emojis.
 5. If the user asks Hinglish questions (e.g., "Calculator kitne ka hai?"), reply naturally in clean Hinglish or English.`;
 }
 
@@ -484,11 +509,18 @@ function generateDynamicFallbackResponse({ query, intent, toolData, user, action
   }
 
   if (intent === 'PRODUCT_VS_SERVICES') {
-    return `Hey ${userName}! 🎒 Here is the difference between CampusHub Products and CampusHub Services:
+    return `Hey ${userName}! 🎒 Here is a complete breakdown of how physical products and services differ on CampusHub:
 
-🛍️ CampusHub Products: Physical store items (e.g., calculators, notebooks, hostel room essentials, snacks) ordered from our 10-minute quick-commerce store and delivered directly to your dorm room floor.
+🛍️ **CampusHub Physical Products**:
+• Store items you purchase and own permanently (e.g., scientific calculators, notebooks, electric kettles, hostel room essentials, snacks, laptop accessories).
+• Delivered straight to your dorm room floor via our 10-15 minute hyperlocal campus runner.
+• Ordered by adding items to your shopping cart and checking out via Campus Pay Wallet, UPI, or Cash on Delivery.
 
-🛠️ CampusHub Services: On-demand professional campus services (e.g., PrintHub PDF document printing, Laptop Cleaning, Laundry, Room Cleaning, and trading pre-owned items in the Second-Hand Marketplace).`;
+🛠️ **CampusHub Services**:
+• On-demand professional utility tasks booked for your dorm room or academic needs.
+• **PrintHub**: Cloud document printing (B&W ₹2/pg, Color ₹10/pg, Spiral Binding ₹49) delivered right to your hostel floor.
+• **Dorm Utility Services**: Schedule skilled helpers for Laptop Cleaning (₹799), Laundry Wash & Fold (₹299), or Room Deep Cleaning (₹199).
+• **Student Marketplace**: Trade pre-owned textbooks, lab coats, cycles, and hostel gear directly with verified dorm peers.`;
   }
 
   if (intent === 'CART_ADD') {
@@ -581,10 +613,16 @@ function generateDynamicFallbackResponse({ query, intent, toolData, user, action
   }
 
   if (intent === 'CATEGORY_SEARCH') {
-    if (toolData.categories && toolData.categories.length > 0) {
-      const catListText = toolData.categories.map(c => `${c.label}`).join('\n• ');
-      return `Hey ${userName}! 🛍️ Here are all the available categories on CampusHub:\n\n• ${catListText}\n\nYou can ask me to show products from any of these categories!`;
-    }
+    return `Hey ${userName}! 🛍️ On **CampusHub**, we've got everything you need to survive and thrive on campus! Here are all the product categories available:
+
+1️⃣ **Study & Stationery**: Scientific calculators, Classmate notebooks, Trimax pens, registers, highlighters, index cards & lab record books.
+2️⃣ **Dorm & Hostel Essentials**: Electric kettles, desk lamps, laundry buckets, bedsheets, blankets, room locks & organizers.
+3️⃣ **Electronics & Accessories**: Laptop chargers, power banks, wireless earphones, USB hubs, keyboards, mice & laptop stands.
+4️⃣ **Personal Care & Hygiene**: Shampoos, soaps, toothpastes, towels, face washes & room fresheners.
+5️⃣ **Combos & Exam Kits**: Curated savings bundles like Exam Starter Pack, Night Owl Snack Box & Freshers Kit.
+6️⃣ **College Merchandise**: Official varsity hoodies, campus t-shirts, caps & tote bags.
+
+You can ask me to search for any item or category above!`;
   }
 
   const lq = query.toLowerCase();
