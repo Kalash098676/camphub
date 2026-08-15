@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { API_BASE } from '../../config/api';
 
 export default function AIChatDrawer({
   aiChatOpen,
@@ -37,8 +38,6 @@ export default function AIChatDrawer({
         currentPage: currentTab,
         cartItemCount: cart.length
       };
-
-      const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
       const response = await fetch(`${API_BASE}/ai/chat`, {
         method: 'POST',

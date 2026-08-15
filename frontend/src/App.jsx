@@ -39,6 +39,7 @@ import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 // Stores
 import { useUserStore } from './store/useUserStore';
 import { useOrderStore } from './store/useOrderStore';
+import { API_BASE } from './config/api';
 
 
 function ScrollToTop() {
@@ -138,7 +139,7 @@ export default function App() {
   const [productsList, setProductsList] = useState(PRODUCTS);
 
   useEffect(() => {
-    fetch('http://localhost:5000/api/products')
+    fetch(`${API_BASE}/products`)
       .then(res => res.json())
       .then(data => {
         if (data.success && data.data && data.data.length > 0) {

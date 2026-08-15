@@ -1,6 +1,5 @@
 import { create } from 'zustand';
-
-const API_BASE = 'http://localhost:5000/api';
+import { API_BASE } from '../config/api';
 
 export const useUserStore = create((set, get) => ({
   currentUser: JSON.parse(localStorage.getItem('campushub_user')) || null,
