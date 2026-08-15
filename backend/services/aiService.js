@@ -253,11 +253,24 @@ export const processAIChatRequest = async ({ message, messages = [], context = {
     console.error('Error executing backend AI tool:', err);
   }
 
-  // 4. Call Gemini API if Key is present
+  // 4. Call Gemini API for natural conversational synthesis (skip Gemini for deterministic DB intents to prevent hallucinated search errors)
   const apiKey = process.env.GEMINI_API_KEY;
   let finalResponseText = '';
 
-  if (apiKey && apiKey !== 'YOUR_GEMINI_API_KEY' && !apiKey.includes('your_actual_gemini')) {
+  const deterministicIntents = [
+    'PRODUCT_CHEAPEST',
+    'PRODUCT_MOST_EXPENSIVE',
+    'PRODUCT_OUT_OF_STOCK',
+    'PRODUCT_IN_STOCK',
+    'PRINTING_INFO',
+    'HOW_TO_ORDER',
+    'PAYMENT_INFO',
+    'DELIVERY_INFO',
+    'RETURN_REFUND_INFO',
+    'PRODUCT_VS_SERVICES'
+  ];
+
+  if (!deterministicIntents.includes(intent) && apiKey && apiKey !== 'YOUR_GEMINI_API_KEY' && !apiKey.includes('your_actual_gemini')) {
     try {
       const systemInstruction = buildSystemPrompt({ user, toolData, intent, context });
       const contents = buildGeminiContents(messages, query);
