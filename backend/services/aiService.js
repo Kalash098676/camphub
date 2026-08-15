@@ -291,7 +291,7 @@ export const processAIChatRequest = async ({ message, messages = [], context = {
 
   // 5. Dynamic Fallback Text Generator (If Gemini text is empty, offline, or truncated)
   if (!finalResponseText || isResponseTruncated(finalResponseText, intent)) {
-    finalResponseText = generateDynamicFallbackResponse({ query, intent, toolData, user, action });
+    finalResponseText = await generateDynamicFallbackResponse({ query, intent, toolData, user, action });
   }
 
   // 6. Sanitize and complete any response text (auto-completes mid-sentence endings like "in 10-" and appends missing sections)
@@ -514,9 +514,9 @@ function buildGeminiContents(messages, currentQuery) {
 }
 
 /**
- * Dynamic DB-aware fallback text generator (used if Gemini API key is missing or offline)
+ * Dynamic Fallback Text Generator
  */
-function generateDynamicFallbackResponse({ query, intent, toolData, user, action }) {
+async function generateDynamicFallbackResponse({ query, intent, toolData, user, action }) {
   const userName = user ? user.name : 'Guest';
 
   if (toolData.authRequired) {
@@ -655,23 +655,11 @@ You can ask me about pricing or how to book any of these services!`;
   }
 
   if (intent === 'CATEGORY_SEARCH' || intent === 'PRODUCT_CATEGORY_LIST') {
-    if (toolData.categories && toolData.categories.length > 0) {
-      const catListText = toolData.categories.map(c => `• **${c.label}** (${c.itemsCount || 0} items available)`).join('\n');
-      return `Here are the product categories currently available on CampusHub:
-
-${catListText}
-
-Want me to show products from any of these categories?`;
-    }
+    const cats = (toolData.categories && toolData.categories.length > 0) ? toolData.categories : await getCategories();
+    const catListText = cats.map(c => `• **${c.label}** (${c.itemsCount || 0} items available)`).join('\n');
     return `Here are the product categories currently available on CampusHub:
 
-• **📚 Study Essentials** (Calculators, Notebooks, Registers, Pens, Highlighters)
-• **💻 Electronics & Accessories** (Laptop Chargers, Power Banks, Earphones, Laptop Stands)
-• **🏠 Hostel Essentials** (Desk Lamps, Laundry Buckets, Bedsheets, Room Locks)
-• **🧴 Personal Care** (Shampoos, Soaps, Towels, Skincare, Sanitizers)
-• **🍽 Kitchen & Utility** (Electric Kettles, Lunch Boxes, Mugs)
-• **🎓 College Merchandise** (Official Varsity Hoodies, Campus T-Shirts, Caps)
-• **📦 Student Combo Packs** (Exam Starter Packs, Night Owl Snack Kits)
+${catListText}
 
 Want me to show products from any of these categories?`;
   }

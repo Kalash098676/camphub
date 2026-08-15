@@ -334,26 +334,42 @@ export const getUserAddresses = async (userId) => {
 export const getCategories = async () => {
   try {
     if (mongoose.connection.readyState === 1) {
-      const dbCategories = await Category.find().lean();
-      if (dbCategories && dbCategories.length > 0) {
-        return dbCategories.map(c => ({ key: c.key, label: c.label, itemsCount: c.itemsCount }));
+      const distinctCats = await Product.aggregate([
+        { $group: { _id: '$category', label: { $first: '$categoryLabel' }, count: { $sum: 1 } } }
+      ]);
+      if (distinctCats && distinctCats.length > 0) {
+        return distinctCats.map(c => ({
+          key: c._id,
+          label: c.label || c._id,
+          itemsCount: c.count
+        }));
       }
     }
   } catch (err) {
     console.warn('MongoDB category query failed:', err.message);
   }
+
+  // Extract distinct categories from seed products.json catalog
+  if (initialProductsCatalog && initialProductsCatalog.length > 0) {
+    const map = new Map();
+    initialProductsCatalog.forEach(p => {
+      if (p.category && !map.has(p.category)) {
+        map.set(p.category, {
+          key: p.category,
+          label: p.categoryLabel || p.category,
+          itemsCount: initialProductsCatalog.filter(x => x.category === p.category).length
+        });
+      }
+    });
+    return Array.from(map.values());
+  }
+
   return [
-    { key: 'study', label: '📚 Study Essentials' },
-    { key: 'electronics', label: '💻 Electronics & Accessories' },
-    { key: 'hostel', label: '🏠 Hostel Room Essentials' },
-    { key: 'personal', label: '🧴 Personal Care' },
-    { key: 'clothing', label: '👕 Clothing Essentials' },
-    { key: 'kitchen', label: '🍽 Kitchen & Utility' },
-    { key: 'merchandise', label: '🎓 College Merchandise' },
-    { key: 'printing', label: '🖨 Printing & Services' },
-    { key: 'services', label: '🛠 Campus Services' },
-    { key: 'marketplace', label: '🔄 Second-Hand Market' },
-    { key: 'combos', label: '📦 Student Combo Packs' }
+    { key: 'study', label: 'Study Essentials', itemsCount: 15 },
+    { key: 'electronics', label: 'Electronics & Accessories', itemsCount: 12 },
+    { key: 'hostel', label: 'Hostel Essentials', itemsCount: 10 },
+    { key: 'personal', label: 'Personal Care', itemsCount: 8 },
+    { key: 'merchandise', label: 'College Merchandise', itemsCount: 6 }
   ];
 };
 
