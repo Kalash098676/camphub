@@ -1,5 +1,6 @@
 import fs from 'fs';
 import path from 'path';
+import { fileURLToPath } from 'url';
 import mongoose from 'mongoose';
 import { Product } from '../models/Product.js';
 import { Order } from '../models/Order.js';
@@ -9,10 +10,13 @@ import { Coupon } from '../models/Coupon.js';
 import { Category } from '../models/Category.js';
 import { campusHubKnowledge } from './campusHubKnowledge.js';
 
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
 // Load static products JSON for offline / zero-result fallback
 let initialProductsCatalog = [];
 try {
-  const jsonPath = path.resolve(process.cwd(), 'backend', 'seed', 'products.json');
+  const jsonPath = path.resolve(__dirname, '../seed/products.json');
   if (fs.existsSync(jsonPath)) {
     initialProductsCatalog = JSON.parse(fs.readFileSync(jsonPath, 'utf-8'));
   }
