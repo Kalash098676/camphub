@@ -1,5 +1,6 @@
 import React from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { useUserStore } from '../store/useUserStore';
 
 export default function Navbar({
   currentTab,
@@ -24,6 +25,7 @@ export default function Navbar({
   const navigate = useNavigate();
   const location = useLocation();
   const currentPath = location.pathname;
+  const isAdminAuthenticated = useUserStore((s) => s.isAdminAuthenticated);
 
   return (
     <header className="navbar-wrapper">
@@ -174,7 +176,10 @@ export default function Navbar({
               if(setCurrentTab) setCurrentTab('profile');
             }
           }}>Profile</button>
-          <button className={`nav-link-btn ${currentPath === '/admin' || currentTab === 'admin_dashboard' ? 'active' : ''}`} onClick={() => { navigate('/admin'); if(setCurrentTab) setCurrentTab('admin_dashboard'); }}>Admin</button>
+          {/* Admin tab hidden once a regular customer is logged in */}
+          {!currentUser && (
+            <button className={`nav-link-btn ${currentPath === '/admin' || currentTab === 'admin_dashboard' ? 'active' : ''}`} onClick={() => { navigate('/admin'); if(setCurrentTab) setCurrentTab('admin_dashboard'); }}>Admin</button>
+          )}
         </nav>
 
         {/* Action Counters */}
@@ -211,7 +216,8 @@ export default function Navbar({
               />
               <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)' }}>{currentUser.name}</span>
             </div>
-          ) : (
+          ) : isAdminAuthenticated ? null : (
+            // Login button hidden while an admin session is active
             <button className="btn btn-secondary" style={{ padding: '0.5rem 1.25rem' }} onClick={() => setLoginOpen(true)}>
               Login
             </button>
@@ -221,4 +227,3 @@ export default function Navbar({
     </header>
   );
 }
-

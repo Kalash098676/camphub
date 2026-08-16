@@ -6,6 +6,7 @@ import { useCartStore } from '../../store/useCartStore';
 import { useUserStore } from '../../store/useUserStore';
 import { useOrderStore } from '../../store/useOrderStore';
 import { useUIStore } from '../../store/useUIStore';
+import { useCouponStore } from '../../store/useCouponStore';
 
 export default function CheckoutModal(props) {
   const storeCart = useCartStore((s) => s.cart);
@@ -17,14 +18,20 @@ export default function CheckoutModal(props) {
   const storeAddAddress = useUserStore((s) => s.addAddress);
   const storeWalletBalance = useUserStore((s) => s.walletBalance);
   const fetchUserProfile = useUserStore((s) => s.fetchUserProfile);
+  const currentUser = useUserStore((s) => s.currentUser);
 
   const storePlaceOrder = useOrderStore((s) => s.placeOrder);
   const storeSetTrackInput = useOrderStore((s) => s.setTrackInput);
+  const existingOrders = useOrderStore((s) => s.orders);
+  const isFirstOrder = existingOrders.length === 0;
 
   const storeCheckoutOpen = useUIStore((s) => s.checkoutOpen);
   const storeSetCheckoutOpen = useUIStore((s) => s.setCheckoutOpen);
   const storeSetTrackOpen = useUIStore((s) => s.setTrackOpen);
   const storeAddToast = useUIStore((s) => s.addToast);
+
+  const validateCoupon = useCouponStore((s) => s.validateCoupon);
+  const getAvailableCoupons = useCouponStore((s) => s.getAvailableCoupons);
 
   const checkoutOpen = props.checkoutOpen !== undefined ? props.checkoutOpen : storeCheckoutOpen;
   const setCheckoutOpen = props.setCheckoutOpen || storeSetCheckoutOpen;
@@ -157,31 +164,26 @@ export default function CheckoutModal(props) {
     setStep(3);
   };
 
-  // Coupon application
+  // Coupon application — validated against the shared coupon store
+  // (admin-created coupons, first-order-only offers, and customer-assigned coupons)
   const handleApplyCoupon = () => {
     const code = couponInput.trim().toUpperCase();
     if (!code) return;
 
-    if (code === 'CAMPUS10') {
-      const discount = Math.round(subtotal * 0.1);
-      setAppliedCoupon('CAMPUS10');
-      setCouponDiscount(discount);
-      setCouponMsg({ type: 'success', text: '10% Campus Discount Applied!' });
-      addToast('Coupon CAMPUS10 applied! Saved ₹' + discount);
-    } else if (code === 'WELCOME50') {
-      const discount = 50;
-      setAppliedCoupon('WELCOME50');
-      setCouponDiscount(discount);
-      setCouponMsg({ type: 'success', text: 'Flat ₹50 Welcome Discount Applied!' });
-      addToast('Coupon WELCOME50 applied!');
-    } else if (code === 'FREESHIP') {
-      const discount = deliveryCharge;
-      setAppliedCoupon('FREESHIP');
-      setCouponDiscount(discount);
-      setCouponMsg({ type: 'success', text: 'Free Campus Runner Delivery Applied!' });
-      addToast('Free delivery coupon applied!');
+    const result = validateCoupon(code, {
+      userEmail: currentUser?.email,
+      isFirstOrder,
+      subtotal,
+      deliveryCharge
+    });
+
+    if (result.success) {
+      setAppliedCoupon(result.coupon.code);
+      setCouponDiscount(result.discount);
+      setCouponMsg({ type: 'success', text: result.message });
+      addToast(`Coupon ${result.coupon.code} applied!${result.discount > 0 ? ` Saved ₹${result.discount}` : ''}`);
     } else {
-      setCouponMsg({ type: 'error', text: 'Invalid coupon code. Try CAMPUS10 or WELCOME50' });
+      setCouponMsg({ type: 'error', text: result.message });
     }
   };
 
@@ -751,9 +753,14 @@ export default function CheckoutModal(props) {
                       </div>
                     )}
 
+                    {/* Coupons this customer is currently eligible for
+                        (public coupons, first-order offers, or ones assigned to their email) */}
                     <div className="suggested-coupons">
-                      <span className="suggested-tag" onClick={() => { setCouponInput('CAMPUS10'); }}>Use CAMPUS10 (10% OFF)</span>
-                      <span className="suggested-tag" onClick={() => { setCouponInput('WELCOME50'); }}>Use WELCOME50 (₹50 OFF)</span>
+                      {getAvailableCoupons({ userEmail: currentUser?.email, isFirstOrder }).map(c => (
+                        <span key={c.code} className="suggested-tag" onClick={() => setCouponInput(c.code)}>
+                          {c.code} — {c.description}
+                        </span>
+                      ))}
                     </div>
                   </div>
 

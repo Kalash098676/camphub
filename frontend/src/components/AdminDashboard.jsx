@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useUserStore } from '../store/useUserStore';
 import { useUIStore } from '../store/useUIStore';
+import { useCouponStore } from '../store/useCouponStore';
 import AdminAuthGate from './modals/AdminAuthGate';
 
 export default function AdminDashboard({ adminActiveTab, setAdminActiveTab }) {
@@ -9,6 +10,19 @@ export default function AdminDashboard({ adminActiveTab, setAdminActiveTab }) {
   const logoutAdmin = useUserStore((s) => s.logoutAdmin);
   const addToast = useUIStore((s) => s.addToast);
 
+  // --- COUPON MANAGEMENT STATE ---
+  const coupons = useCouponStore((s) => s.coupons);
+  const addCoupon = useCouponStore((s) => s.addCoupon);
+  const toggleCoupon = useCouponStore((s) => s.toggleCoupon);
+  const removeCoupon = useCouponStore((s) => s.removeCoupon);
+
+  const [newCouponCode, setNewCouponCode] = useState('');
+  const [newCouponType, setNewCouponType] = useState('percent');
+  const [newCouponValue, setNewCouponValue] = useState('');
+  const [newCouponDesc, setNewCouponDesc] = useState('');
+  const [newCouponFirstOrderOnly, setNewCouponFirstOrderOnly] = useState(false);
+  const [newCouponAssignEmail, setNewCouponAssignEmail] = useState('');
+
   if (!isAdminAuthenticated) {
     return <AdminAuthGate />;
   }
@@ -16,6 +30,32 @@ export default function AdminDashboard({ adminActiveTab, setAdminActiveTab }) {
   const handleAdminLogout = () => {
     logoutAdmin();
     addToast('Admin Session Revoked. Security Gate Locked.');
+  };
+
+  const handleCreateCoupon = (e) => {
+    e.preventDefault();
+    if (!newCouponCode.trim()) {
+      addToast('Please enter a coupon code', true);
+      return;
+    }
+    if (newCouponType !== 'freedelivery' && (!newCouponValue || Number(newCouponValue) <= 0)) {
+      addToast('Please enter a valid discount value', true);
+      return;
+    }
+    addCoupon({
+      code: newCouponCode,
+      type: newCouponType,
+      value: Number(newCouponValue) || 0,
+      description: newCouponDesc.trim() || `${newCouponCode.trim().toUpperCase()} discount`,
+      firstOrderOnly: newCouponFirstOrderOnly,
+      assignedEmail: newCouponAssignEmail
+    });
+    addToast(`Coupon ${newCouponCode.trim().toUpperCase()} created!`);
+    setNewCouponCode('');
+    setNewCouponValue('');
+    setNewCouponDesc('');
+    setNewCouponFirstOrderOnly(false);
+    setNewCouponAssignEmail('');
   };
 
   return (
@@ -38,6 +78,7 @@ export default function AdminDashboard({ adminActiveTab, setAdminActiveTab }) {
           <button className={`admin-tab-btn ${adminActiveTab === 'delivery' ? 'active' : ''}`} onClick={() => setAdminActiveTab('delivery')}>🏃 Delivery Partners</button>
           <button className={`admin-tab-btn ${adminActiveTab === 'inventory' ? 'active' : ''}`} onClick={() => setAdminActiveTab('inventory')}>📋 Inventory Stock</button>
           <button className={`admin-tab-btn ${adminActiveTab === 'users' ? 'active' : ''}`} onClick={() => setAdminActiveTab('users')}>👥 Users Status</button>
+          <button className={`admin-tab-btn ${adminActiveTab === 'coupons' ? 'active' : ''}`} onClick={() => setAdminActiveTab('coupons')}>🏷️ Coupons</button>
         </div>
         
         <div className="admin-dashboard-content">
@@ -153,6 +194,125 @@ export default function AdminDashboard({ adminActiveTab, setAdminActiveTab }) {
               <p style={{ color: 'var(--text-secondary)', fontSize: '0.88rem' }}>
                 Registered campus student accounts and active buyer profiles.
               </p>
+            </div>
+          )}
+
+          {adminActiveTab === 'coupons' && (
+            <div className="admin-panel-fade">
+              <h3 className="admin-section-title">Coupon Management</h3>
+              <p style={{ color: 'var(--text-secondary)', fontSize: '0.88rem', marginBottom: '1rem' }}>
+                Create public coupons, first-order-only offers, or a coupon assigned to one specific student.
+              </p>
+
+              <form className="coupon-create-form" onSubmit={handleCreateCoupon}>
+                <div className="form-grid">
+                  <div>
+                    <label style={{ fontSize: '0.8rem', fontWeight: 600 }}>Coupon Code</label>
+                    <input 
+                      type="text" 
+                      placeholder="e.g. DIWALI20" 
+                      value={newCouponCode} 
+                      onChange={(e) => setNewCouponCode(e.target.value)} 
+                      className="modal-input" 
+                    />
+                  </div>
+                  <div>
+                    <label style={{ fontSize: '0.8rem', fontWeight: 600 }}>Type</label>
+                    <select 
+                      value={newCouponType} 
+                      onChange={(e) => setNewCouponType(e.target.value)} 
+                      className="modal-input"
+                    >
+                      <option value="percent">Percentage Off</option>
+                      <option value="flat">Flat Amount Off</option>
+                      <option value="freedelivery">Free Delivery</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="form-grid" style={{ marginTop: '0.65rem' }}>
+                  {newCouponType !== 'freedelivery' && (
+                    <div>
+                      <label style={{ fontSize: '0.8rem', fontWeight: 600 }}>
+                        {newCouponType === 'percent' ? 'Percent (%)' : 'Amount (₹)'}
+                      </label>
+                      <input 
+                        type="number" 
+                        min="0" 
+                        value={newCouponValue} 
+                        onChange={(e) => setNewCouponValue(e.target.value)} 
+                        className="modal-input" 
+                      />
+                    </div>
+                  )}
+                  <div>
+                    <label style={{ fontSize: '0.8rem', fontWeight: 600 }}>Assign to Customer Email (optional)</label>
+                    <input 
+                      type="email" 
+                      placeholder="Leave blank for all customers" 
+                      value={newCouponAssignEmail} 
+                      onChange={(e) => setNewCouponAssignEmail(e.target.value)} 
+                      className="modal-input" 
+                    />
+                  </div>
+                </div>
+
+                <div style={{ marginTop: '0.65rem' }}>
+                  <label style={{ fontSize: '0.8rem', fontWeight: 600 }}>Description</label>
+                  <input 
+                    type="text" 
+                    placeholder="e.g. Diwali Sale — 20% off" 
+                    value={newCouponDesc} 
+                    onChange={(e) => setNewCouponDesc(e.target.value)} 
+                    className="modal-input" 
+                  />
+                </div>
+
+                <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginTop: '0.65rem', fontSize: '0.85rem' }}>
+                  <input 
+                    type="checkbox" 
+                    checked={newCouponFirstOrderOnly} 
+                    onChange={(e) => setNewCouponFirstOrderOnly(e.target.checked)} 
+                  />
+                  First Order Only (new customers)
+                </label>
+
+                <button type="submit" className="btn btn-primary" style={{ marginTop: '0.85rem' }}>+ Create Coupon</button>
+              </form>
+
+              <table className="admin-orders-table" style={{ marginTop: '1.5rem' }}>
+                <thead>
+                  <tr>
+                    <th>Code</th>
+                    <th>Type</th>
+                    <th>Value</th>
+                    <th>Scope</th>
+                    <th>Status</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {coupons.map(c => (
+                    <tr key={c.code}>
+                      <td>
+                        <strong>{c.code}</strong><br />
+                        <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{c.description}</span>
+                      </td>
+                      <td>{c.type === 'percent' ? 'Percent' : c.type === 'flat' ? 'Flat' : 'Free Delivery'}</td>
+                      <td>{c.type === 'percent' ? `${c.value}%` : c.type === 'flat' ? `₹${c.value}` : '—'}</td>
+                      <td>
+                        {c.firstOrderOnly ? 'First Order' : 'Any Order'}
+                        {c.assignedEmail ? ` · ${c.assignedEmail}` : ' · All Customers'}
+                      </td>
+                      <td><span className={`badge ${c.active ? 'badge-success' : 'badge-warning'}`}>{c.active ? 'Active' : 'Disabled'}</span></td>
+                      <td style={{ display: 'flex', gap: '0.4rem' }}>
+                        <button className="btn-link" onClick={() => toggleCoupon(c.code)}>{c.active ? 'Disable' : 'Enable'}</button>
+                        <button className="btn-link" onClick={() => removeCoupon(c.code)}>Delete</button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           )}
         </div>
