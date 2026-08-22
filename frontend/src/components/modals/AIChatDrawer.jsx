@@ -24,6 +24,12 @@ export default function AIChatDrawer({
 
   useEffect(() => {
     scrollToBottom();
+    const timer1 = setTimeout(scrollToBottom, 100);
+    const timer2 = setTimeout(scrollToBottom, 300);
+    return () => {
+      clearTimeout(timer1);
+      clearTimeout(timer2);
+    };
   }, [aiMessages, isTyping, aiChatOpen]);
 
   const handleSend = async (e) => {
@@ -211,7 +217,8 @@ export default function AIChatDrawer({
                           <img 
                             src={prod.image || 'https://images.unsplash.com/photo-1574634534894-89d7576c8259?auto=format&fit=crop&q=80&w=400'} 
                             alt={prod.title}
-                            style={{ width: '48px', height: '48px', objectFit: 'cover', borderRadius: '6px' }}
+                            onLoad={scrollToBottom}
+                            style={{ width: '48px', height: '48px', objectFit: 'cover', borderRadius: '6px', flexShrink: 0 }}
                           />
                           <div style={{ flex: 1, minWidth: 0 }}>
                             <div style={{ fontSize: '0.8rem', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>

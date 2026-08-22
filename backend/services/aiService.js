@@ -13,6 +13,119 @@ import {
 import { campusHubKnowledge } from './campusHubKnowledge.js';
 
 /**
+ * Helper to extract valid product keyword or product noun from user query.
+ * Returns empty string if query is generic, conversational, or doesn't contain a product noun.
+ */
+export function extractProductKeyword(query) {
+  if (!query || typeof query !== 'string') return '';
+  const lower = query.toLowerCase().trim();
+
+  // Known product keywords & nouns in CampusHub catalog
+  const knownProductNouns = [
+    'calculator', 'notebooks', 'notebook', 'desk organizer', 'organizer', 'water bottle', 'bottle',
+    'laptop stand', 'laptop', 'diffuser', 'hoodie', 'journal', 'gel pen', 'pens', 'pen',
+    'multi-port hub', 'usb hub', 'usb-c', 'usb', 'cushion', 'backpack', 'bag',
+    'exam prep kit', 'exam kit', 'freshers kit', 'hostel starter kit', 'hostel kit',
+    'placement crack kit', 'placement kit', 'starter kit', 'electric kettle', 'kettle',
+    'bucket', 'mug', 'bedsheet', 'blanket', 'towel', 'soap', 'shampoo', 'toothpaste',
+    'charger', 'cable', 'headphone', 'headphones', 'earbuds', 'mouse', 'keyboard',
+    'lock', 'combos', 'combo', 'kit', 'stationery', 'resumes', 'folder', 'sticky notes'
+  ];
+
+  // Direct match for known product nouns
+  for (const noun of knownProductNouns) {
+    const regex = new RegExp(`\\b${noun}\\b`, 'i');
+    if (regex.test(lower)) {
+      return noun;
+    }
+  }
+
+  // Check if query is a generic phrase, prompt question, confirmation, or category command
+  if (
+    lower.includes('all products') ||
+    lower.includes('all categories') ||
+    lower.includes('from all') ||
+    lower.includes('show categories') ||
+    lower.includes('browse categories') ||
+    lower.includes('want me to show') ||
+    lower.includes('how products') ||
+    lower.includes('what products') ||
+    lower.includes('what can i buy') ||
+    lower === 'yes' || lower === 'yes please' || lower === 'sure' || lower === 'yeah' || lower === 'ok' || lower === 'okay' ||
+    lower === 'show products' || lower === 'show me products' || lower === 'all items' || lower === 'show all'
+  ) {
+    return '';
+  }
+
+  // Clean lead-in verbs, stop words, and filler terms
+  let clean = lower
+    .replace(/^(?:show me|search for|do you have|can i get|i want|i need|looking for|find|display|list|any|available|which|what|is there|are there|where is|how about)\s+/gi, '')
+    .replace(/under|below|above|less than|more than|cheap|cheapest|best|top|rated|in stock|out of stock|₹\d+|\d+/gi, '')
+    .replace(/products|product|items|item|store|categories|category|all|please|thanks|thank you|from|these|those|this|that/gi, '')
+    .trim();
+
+  // Words that are purely generic/conversational
+  const genericWords = new Set([
+    'how', 'from', 'these', 'this', 'that', 'those', 'want', 'show', 'tell', 'about',
+    'yes', 'yeah', 'sure', 'ok', 'okay', 'see', 'view', 'browse', 'give', 'have',
+    'some', 'something', 'thing', 'things', 'many', 'much', 'more', 'less', 'good',
+    'which', 'where', 'when', 'what', 'who', 'why', 'can', 'could', 'would', 'should'
+  ]);
+
+  const words = clean.split(/\s+/).filter(w => w.length >= 3 && !genericWords.has(w) && isNaN(w));
+
+  if (words.length > 0) {
+    const extracted = words.join(' ');
+    if (extracted.length >= 3 && !genericWords.has(extracted)) {
+      return extracted;
+    }
+  }
+
+  return '';
+}
+
+/**
+ * Helper to match explicit category searches from user prompt or category chip clicks.
+ */
+export function extractCategoryKey(query) {
+  if (!query || typeof query !== 'string') return null;
+  const lower = query.toLowerCase().trim();
+
+  if (lower.includes('hostel essentials') || lower.includes('hostel essential')) {
+    return { key: 'hostel', label: 'Hostel Essentials' };
+  }
+  if (lower.includes('electronics & accessories') || lower.includes('electronics') || lower.includes('electronic accessories')) {
+    return { key: 'electronics', label: 'Electronics & Accessories' };
+  }
+  if (lower.includes('study essentials') || lower.includes('study essential')) {
+    return { key: 'study', label: 'Study Essentials' };
+  }
+  if (lower.includes('college merchandise') || lower.includes('merchandise') || lower.includes('college merch')) {
+    return { key: 'merchandise', label: 'College Merchandise' };
+  }
+  if (lower.includes('student combo packs') || lower.includes('combo packs') || lower.includes('combos')) {
+    return { key: 'combos', label: 'Student Combo Packs' };
+  }
+  if (lower.includes('kitchen & utility') || lower.includes('kitchen utility')) {
+    return { key: 'kitchen', label: 'Kitchen & Utility' };
+  }
+  if (lower.includes('personal care')) {
+    return { key: 'personal', label: 'Personal Care' };
+  }
+
+  // Generic category keywords in prompt ("products in hostel", "show study category")
+  if (lower.includes('in hostel') || lower.includes('hostel products')) return { key: 'hostel', label: 'Hostel Essentials' };
+  if (lower.includes('in electronics') || lower.includes('electronic products')) return { key: 'electronics', label: 'Electronics & Accessories' };
+  if (lower.includes('in study') || lower.includes('study products') || lower.includes('stationery')) return { key: 'study', label: 'Study Essentials' };
+  if (lower.includes('in kitchen') || lower.includes('kitchen products')) return { key: 'kitchen', label: 'Kitchen & Utility' };
+  if (lower.includes('in personal') || lower.includes('personal products')) return { key: 'personal', label: 'Personal Care' };
+  if (lower.includes('in merchandise') || lower.includes('merch products')) return { key: 'merchandise', label: 'College Merchandise' };
+  if (lower.includes('in combos') || lower.includes('combo products')) return { key: 'combos', label: 'Student Combo Packs' };
+
+  return null;
+}
+
+/**
  * Main AI Process Request Function
  */
 export const processAIChatRequest = async ({ message, messages = [], context = {}, user = null }) => {
@@ -33,7 +146,11 @@ export const processAIChatRequest = async ({ message, messages = [], context = {
 
   // 3. Execute Controlled Backend Tool Operations based on Intent
   try {
-    if (intent === 'PRODUCT_CHEAPEST' || intent === 'PRODUCT_MOST_EXPENSIVE' || intent === 'PRODUCT_OUT_OF_STOCK' || intent === 'PRODUCT_IN_STOCK' || intent === 'PRODUCT_SEARCH' || intent === 'PRODUCT_PRICE' || intent === 'PRODUCT_AVAILABILITY' || intent === 'PRODUCT_RECOMMENDATION') {
+    if (intent === 'ALL_PRODUCTS') {
+      productsResult = await searchProducts({ limit: 18 });
+      toolData.products = productsResult;
+    }
+    else if (intent === 'PRODUCT_CHEAPEST' || intent === 'PRODUCT_MOST_EXPENSIVE' || intent === 'PRODUCT_OUT_OF_STOCK' || intent === 'PRODUCT_IN_STOCK' || intent === 'PRODUCT_SEARCH' || intent === 'PRODUCT_PRICE' || intent === 'PRODUCT_AVAILABILITY' || intent === 'PRODUCT_RECOMMENDATION') {
       let maxPrice = null;
       let minPrice = null;
       
@@ -68,8 +185,14 @@ export const processAIChatRequest = async ({ message, messages = [], context = {
       }
 
       // Check category keyword
+      const catMatch = extractCategoryKey(query);
       let category = '';
-      if (lowerQuery.includes('kettle') || lowerQuery.includes('kitchen') || lowerQuery.includes('mug') || lowerQuery.includes('plate') || lowerQuery.includes('bowl') || lowerQuery.includes('lunch box')) {
+      if (catMatch) {
+        category = catMatch.key;
+        toolData.searchedCategoryLabel = catMatch.label;
+      } else if (lowerQuery.includes('combo') || lowerQuery.includes('kit') || lowerQuery.includes('bundle') || lowerQuery.includes('exam')) {
+        category = 'combos';
+      } else if (lowerQuery.includes('kettle') || lowerQuery.includes('kitchen') || lowerQuery.includes('mug') || lowerQuery.includes('plate') || lowerQuery.includes('bowl') || lowerQuery.includes('lunch box')) {
         category = 'kitchen';
       } else if (lowerQuery.includes('electronic') || lowerQuery.includes('calculator') || lowerQuery.includes('laptop') || lowerQuery.includes('mouse') || lowerQuery.includes('charger') || lowerQuery.includes('cable') || lowerQuery.includes('headphone') || lowerQuery.includes('power bank')) {
         category = 'electronics';
@@ -77,23 +200,18 @@ export const processAIChatRequest = async ({ message, messages = [], context = {
         category = 'study';
       } else if (lowerQuery.includes('hostel') || lowerQuery.includes('dorm') || lowerQuery.includes('lamp') || lowerQuery.includes('bucket') || lowerQuery.includes('bedsheet') || lowerQuery.includes('blanket') || lowerQuery.includes('lock')) {
         category = 'hostel';
-      } else if (lowerQuery.includes('combo') || lowerQuery.includes('kit') || lowerQuery.includes('bundle') || lowerQuery.includes('exam')) {
-        category = 'combos';
       } else if (lowerQuery.includes('shampoo') || lowerQuery.includes('soap') || lowerQuery.includes('toothpaste') || lowerQuery.includes('towel') || lowerQuery.includes('diffuser') || lowerQuery.includes('personal')) {
         category = 'personal';
       } else if (lowerQuery.includes('hoodie') || lowerQuery.includes('t-shirt') || lowerQuery.includes('shirt') || lowerQuery.includes('merchandise')) {
         category = 'merchandise';
       }
 
-      // Clean search term
+      // Extract search term cleanly
       let searchTerm = '';
-      if (intent === 'PRODUCT_SEARCH' || intent === 'PRODUCT_PRICE' || intent === 'PRODUCT_AVAILABILITY') {
-        let clean = query
-          .replace(/show me|search for|do you have|any|available|under|below|above|less than|more than|cheap|cheapest|best|products|product|item|items|which|currently|out of stock|in stock|₹\d+|\d+/gi, '')
-          .trim();
-        if (clean.length >= 3 && !category) {
-          searchTerm = clean;
-        }
+      if (catMatch && (lowerQuery.includes('show products in') || lowerQuery.includes('products in') || lowerQuery.includes('category') || !extractProductKeyword(query))) {
+        searchTerm = ''; // Pure category listing
+      } else if (intent === 'PRODUCT_SEARCH' || intent === 'PRODUCT_PRICE' || intent === 'PRODUCT_AVAILABILITY') {
+        searchTerm = extractProductKeyword(query);
       } else {
         if (lowerQuery.includes('calculator')) searchTerm = 'calculator';
         else if (lowerQuery.includes('kettle')) searchTerm = 'kettle';
@@ -102,7 +220,7 @@ export const processAIChatRequest = async ({ message, messages = [], context = {
         else if (lowerQuery.includes('laptop')) searchTerm = 'laptop';
       }
 
-      const limit = (intent === 'PRODUCT_CHEAPEST' || intent === 'PRODUCT_MOST_EXPENSIVE') ? 1 : (lowerQuery.includes('all categories') || lowerQuery.includes('all category') || lowerQuery.includes('from all') || lowerQuery.includes('show all')) ? 18 : 6;
+      const limit = (intent === 'PRODUCT_CHEAPEST' || intent === 'PRODUCT_MOST_EXPENSIVE') ? 1 : (catMatch ? 12 : 6);
 
       productsResult = await searchProducts({
         query: searchTerm,
@@ -116,6 +234,7 @@ export const processAIChatRequest = async ({ message, messages = [], context = {
       });
 
       toolData.products = productsResult;
+      toolData.searchedTerm = searchTerm;
     } 
     else if (intent === 'FOLLOW_UP_CHEAPEST' || intent === 'FOLLOW_UP_RECOMMEND' || intent === 'FOLLOW_UP_PRICE' || intent === 'FOLLOW_UP_STOCK') {
       // User asking follow-up question referring to recent conversation products
@@ -148,7 +267,7 @@ export const processAIChatRequest = async ({ message, messages = [], context = {
 
       if (!targetProduct) {
         // Extract product keyword
-        const cleanTerm = query.replace(/add|to cart|to my cart|please|item|product|1|2|3|a/gi, '').trim();
+        const cleanTerm = extractProductKeyword(query);
         if (cleanTerm) {
           const searchRes = await searchProducts({ query: cleanTerm, limit: 1 });
           if (searchRes.length > 0) targetProduct = searchRes[0];
@@ -238,7 +357,7 @@ export const processAIChatRequest = async ({ message, messages = [], context = {
     else if (intent === 'COUPON_INFO') {
       toolData.coupons = await getCoupons();
     }
-    else if (intent === 'CATEGORY_SEARCH') {
+    else if (intent === 'CATEGORY_SEARCH' || intent === 'PRODUCT_CATEGORY_LIST') {
       toolData.categories = await getCategories();
     }
     else if (intent === 'NAVIGATION') {
@@ -258,10 +377,14 @@ export const processAIChatRequest = async ({ message, messages = [], context = {
   let finalResponseText = '';
 
   const deterministicIntents = [
+    'ALL_PRODUCTS',
+    'PRODUCT_CATEGORY_LIST',
+    'CATEGORY_SEARCH',
     'PRODUCT_CHEAPEST',
     'PRODUCT_MOST_EXPENSIVE',
     'PRODUCT_OUT_OF_STOCK',
     'PRODUCT_IN_STOCK',
+    'PRODUCT_SEARCH',
     'PRINTING_INFO',
     'HOW_TO_ORDER',
     'PAYMENT_INFO',
@@ -327,7 +450,7 @@ export const processAIChatRequest = async ({ message, messages = [], context = {
     finalResponseText = await generateDynamicFallbackResponse({ query, intent, toolData, user, action });
   }
 
-  // 6. Sanitize and complete any response text (auto-completes mid-sentence endings like "in 10-" and appends missing sections)
+  // 6. Sanitize and complete any response text
   finalResponseText = sanitizeAndCompleteResponse(finalResponseText, intent, toolData, user);
 
   // 7. Return Structured Output
@@ -341,7 +464,8 @@ export const processAIChatRequest = async ({ message, messages = [], context = {
       wallet: toolData.walletInfo || null,
       profile: toolData.userProfile || null,
       services: toolData.services || null,
-      coupons: toolData.coupons || null
+      coupons: toolData.coupons || null,
+      categories: toolData.categories || null
     },
     action
   };
@@ -353,7 +477,44 @@ export const processAIChatRequest = async ({ message, messages = [], context = {
 function classifyIntent(query, context, isLoggedIn) {
   const lower = query.replace(/[“”"'`]/g, '').trim().toLowerCase();
 
-  // Dedicated Product Intents (Cheapest, Out of Stock, Most Expensive, In Stock)
+  // 0. Greetings & General Website Overview
+  if (lower === 'hi' || lower === 'hello' || lower === 'hey' || lower === 'greetings' || lower === 'good morning' || lower === 'good evening' || lower === 'help' || lower === 'what can you do') {
+    return 'GENERAL_WEBSITE';
+  }
+
+  // Explicit single category product search request ("Show products in Hostel Essentials", etc.)
+  const catSearch = extractCategoryKey(query);
+  if (catSearch && !lower.includes('all categories') && !lower.includes('from all categories') && !lower.includes('all products')) {
+    return 'PRODUCT_SEARCH';
+  }
+
+  // 1. ALL PRODUCTS / Category prompt responses / Generic product requests across categories
+  if (
+    lower.includes('all products') ||
+    lower.includes('products from all') ||
+    lower.includes('from all categories') ||
+    lower.includes('all categories') ||
+    lower.includes('all category') ||
+    lower.includes('all items') ||
+    lower.includes('show all') ||
+    lower.includes('how products from all') ||
+    lower.includes('want me to show products') ||
+    lower.match(/show products from all/i) ||
+    lower.match(/products in all/i) ||
+    lower.match(/how products/i)
+  ) {
+    return 'ALL_PRODUCTS';
+  }
+
+  // Affirmative responses or category prompt follow-ups ("yes", "sure", "yeah", "ok", "show products")
+  if (
+    lower === 'yes' || lower === 'yes please' || lower === 'sure' || lower === 'yeah' ||
+    lower === 'ok' || lower === 'okay' || lower === 'show products' || lower === 'show me products'
+  ) {
+    return 'ALL_PRODUCTS';
+  }
+
+  // 2. Dedicated Product Intents (Cheapest, Out of Stock, Most Expensive, In Stock)
   if (lower.includes('out of stock') || lower.includes('unavailable products') || lower.includes('items are unavailable') || lower.includes('products are unavailable') || lower.includes('zero stock') || lower.includes('not available right now') || lower.includes('marked as out of stock')) {
     return 'PRODUCT_OUT_OF_STOCK';
   }
@@ -368,23 +529,26 @@ function classifyIntent(query, context, isLoggedIn) {
     return 'PRODUCT_IN_STOCK';
   }
 
-  // 1. Difference Question (Product vs Services)
+  // 3. Difference Question (Product vs Services)
   if (lower.match(/difference between.*product.*service|product vs service|difference.*service|how do (?:products|services) differ/i)) {
     return 'PRODUCT_VS_SERVICES';
   }
 
-  // 2. General Website overview ("tell me everything i can do", "about campushub", "what can i do on campushub")
+  // 4. General Website overview
   if (lower.match(/what is campushub|about campushub|what can i do|everything i can do|how does campushub work|tell me about campushub/i)) {
     return 'GENERAL_WEBSITE';
   }
 
-  // 3. Service Query Intent ("what services are available", "what can i book")
+  // 5. Service Query Intent
   if (lower.match(/what services|available services|services available|service available|services do you|what can i book|book service|tell me about your services|campus services/i)) {
     return 'SERVICE_LIST';
   }
 
-  // 4. Product Category Query Intent ("what categories are available", "what product categories do you have", "which categories can i browse")
-  if (lower.match(/what (?:product )?categories|categories available|available categories|category available|types of products|show me all categories|which categories|list categories/i)) {
+  // 6. Product Category Query Intent
+  if (
+    lower === 'show categories' || lower === 'browse categories' || lower === 'list categories' ||
+    lower.match(/what (?:product )?categories|categories available|available categories|category available|types of products|show me all categories|which categories|list categories/i)
+  ) {
     return 'PRODUCT_CATEGORY_LIST';
   }
 
@@ -409,40 +573,27 @@ function classifyIntent(query, context, isLoggedIn) {
   if (lower.match(/wallet|balance|campus pay|my money|transactions|cashback|wallet balance/i)) return 'WALLET_BALANCE';
   if (lower.match(/my profile|my student id|my department|my room number|my room no|my hostel block|who am i|profile/i)) return 'PROFILE_INFO';
   if (lower.match(/address|delivery location|saved address/i)) return 'ADDRESS_INFO';
-
-  if (lower.match(/payment|pay|how (?:can|do|to) (?:i |we )?pay|make a payment|payment methods|payment options|cash on delivery|cod|upi|wallet pay|credit card|debit card/i)) {
-    return 'PAYMENT_INFO';
-  }
-
-  if (lower.match(/delivery time|how long (?:does )?delivery|delivery fee|shipping|delivery process|10 minute delivery|how fast/i)) {
-    return 'DELIVERY_INFO';
-  }
-
-  if (lower.match(/return|refund|cancellation|cancel order|how to return|exchange/i)) {
-    return 'RETURN_REFUND_INFO';
-  }
-
-  if (lower.match(/show product|show products|list product|display product|products from|products in/i)) {
-    return 'PRODUCT_SEARCH';
-  }
-
-  if (lower.match(/category|categories|catagories|catagorie|catagory|catagori/i)) {
-    return 'CATEGORY_SEARCH';
-  }
+  if (lower.match(/payment|pay|how (?:can|do|to) (?:i |we )?pay|make a payment|payment methods|payment options|cash on delivery|cod|upi|wallet pay|credit card|debit card/i)) return 'PAYMENT_INFO';
+  if (lower.match(/delivery time|how long (?:does )?delivery|delivery fee|shipping|delivery process|10 minute delivery|how fast/i)) return 'DELIVERY_INFO';
+  if (lower.match(/return|refund|cancellation|cancel order|how to return|exchange/i)) return 'RETURN_REFUND_INFO';
 
   if (lower.match(/print|printhub|print section|pdf|photocopy|spiral|binding|lamination/i)) return 'PRINTING_INFO';
   if (lower.match(/laundry|cleaning|laptop clean|room clean|service|services/i)) return 'SERVICE_INFO';
   if (lower.match(/marketplace|second-hand|buy used|sell item|pre-owned/i)) return 'MARKETPLACE_INFO';
   if (lower.match(/coupon|coupons|discount|promo|offer|code/i)) return 'COUPON_INFO';
-
   if (lower.match(/where is|how to go|open cart|open orders|open wallet|open marketplace/i)) return 'NAVIGATION';
 
-  if (lower.match(/hi\b|hello\b|hey\b|greetings|good morning|good evening/i)) {
-    return 'GENERAL_WEBSITE';
+  if (lower.match(/category|categories|catagories|catagorie|catagory|catagori/i)) {
+    return 'CATEGORY_SEARCH';
   }
 
-  // DEFAULT EVERYTHING ELSE TO PRODUCT_SEARCH so any raw product name or query searches MongoDB!
-  return 'PRODUCT_SEARCH';
+  // Check if query contains an explicit product keyword/noun
+  const keyword = extractProductKeyword(query);
+  if (keyword) {
+    return 'PRODUCT_SEARCH';
+  }
+
+  return 'GENERAL_WEBSITE';
 }
 
 /**
@@ -568,6 +719,14 @@ async function generateDynamicFallbackResponse({ query, intent, toolData, user, 
     return `Hey ${userName}! 🔐 ${toolData.authMessage}`;
   }
 
+  if (intent === 'ALL_PRODUCTS') {
+    if (toolData.products && toolData.products.length > 0) {
+      return `Hey ${userName}! 🎒 Here are available products from all categories in our CampusHub store! Check out the listings below:`;
+    } else {
+      return `Hey ${userName}! 🎒 Here are available store products.`;
+    }
+  }
+
   if (intent === 'PRODUCT_CHEAPEST') {
     if (toolData.products && toolData.products.length > 0) {
       let cheapestProd = toolData.products[0];
@@ -629,16 +788,26 @@ async function generateDynamicFallbackResponse({ query, intent, toolData, user, 
   }
 
   if (intent === 'PRODUCT_SEARCH' || intent === 'FOLLOW_UP_CHEAPEST') {
+    const searchTerm = toolData.searchedTerm || extractProductKeyword(query);
+    const catLabel = toolData.searchedCategoryLabel;
+
     if (toolData.products && toolData.products.length > 0) {
       const pCount = toolData.products.length;
       const topP = toolData.products[0];
-      return `Hey ${userName}! 🎒 I found ${pCount} matching items in the CampusHub store! The top result is "${topP.title}" for ₹${topP.price}. Check out the details below!`;
-    } else {
-      let cleanTerm = query.replace(/which|what|where|show|me|the|cheapest|available|currently|products|product|items|item|in stock|out of stock|is|are|do|you|have|any|under|below|above|₹\d+|\d+/gi, '').trim();
-      if (cleanTerm.length > 2) {
-        return `Sorry ${userName}! 🎒 The item "${cleanTerm}" is not available in our CampusHub database right now. Try searching for available items like calculators, notebooks, pens, electric kettles, or laptop stands!`;
+      if (catLabel) {
+        return `Hey ${userName}! 🎒 Here are available products in the **${catLabel}** category in our CampusHub store! Check out the listings below:`;
+      } else if (searchTerm) {
+        return `Hey ${userName}! 🎒 I found ${pCount} matching item(s) for "${searchTerm}" in the CampusHub store! The top result is "${topP.title}" for ₹${topP.price}. Check out the details below!`;
       } else {
-        return `Sorry ${userName}! 🎒 I couldn't find any matching items in our CampusHub database right now. Try searching for available items like calculators, notebooks, pens, electric kettles, or laptop stands!`;
+        return `Hey ${userName}! 🎒 Here are available products in our CampusHub store! Check out the details below:`;
+      }
+    } else {
+      if (catLabel) {
+        return `Sorry ${userName}! 🎒 There are currently no products in the "${catLabel}" category available right now.`;
+      } else if (searchTerm && searchTerm.length >= 2) {
+        return `Sorry ${userName}! 🎒 The item "${searchTerm}" is not available in our CampusHub database right now. Try searching for available items like calculators, notebooks, pens, electric kettles, or laptop stands!`;
+      } else {
+        return `Hey ${userName}! 🎒 I couldn't find any specific product matching your query. Here are some popular items available in our CampusHub store right now!`;
       }
     }
   }
@@ -664,7 +833,7 @@ async function generateDynamicFallbackResponse({ query, intent, toolData, user, 
 • On-demand professional utility tasks booked for your dorm room or academic needs.
 • **PrintHub**: Cloud document printing (B&W ₹2/pg, Color ₹10/pg, Spiral Binding ₹49) delivered right to your hostel floor.
 • **Dorm Utility Services**: Schedule skilled helpers for Laptop Cleaning (₹799), Laundry Wash & Fold (₹299), or Room Deep Cleaning (₹199).
-• **Student Marketplace**: Trade pre-owned textbooks, lab coats, cycles, and hostel gear directly with verified dorm peers.`;
+• **Student Marketplace**: Trade pre-owned textbooks, lab coats, cycles, and hostel gear directly with dorm peers.`;
   }
 
   if (intent === 'CART_ADD') {
@@ -748,146 +917,39 @@ Place your order! Our campus runner delivers your items straight to your hostel 
     if (toolData.userProfile) {
       const p = toolData.userProfile;
       return `Hey ${p.name}! 🎓 Profile Details: Student ID: ${p.studentId} | Dept: ${p.department} | Hostel: ${p.hostelBlock}, Room ${p.roomNo} | Wallet: ₹${p.walletBalance}.`;
+    } else {
+      return `Hey ${userName}! 🎓 Please log in to view your detailed student profile specs.`;
     }
   }
 
-  if (intent === 'PRINTING_INFO') {
-    return `Hey ${userName}! 🖨️ Here is everything you need to know about PrintHub cloud document printing on CampusHub:
-
-📄 **What You Can Print**:
-• Assignment PDFs, Lecture Notes, Lab Records, Presentations, & Exam Question Papers (PDF/DOCX/PNG format).
-
-💰 **Pricing & Print Rates**:
-• **Black & White Printing**: ₹2 / page
-• **Color Printing**: ₹10 / page
-• **Spiral Binding**: ₹49 (includes durable plastic front/back cover)
-• **Staple Binding**: ₹10
-• **Lamination**: ₹30
-
-⚙️ **Custom Print Options**:
-• Paper Sizes: A4, A3
-• Sides: Single-sided or Double-sided (Duplex)
-
-🚀 **How to Order & Use PrintHub**:
-1️⃣ Go to the **PrintHub** section from the top navigation bar.
-2️⃣ Upload your document file (PDF or DOCX).
-3️⃣ Select page range, color mode (B&W/Color), paper size, and binding preference.
-4️⃣ Enter your hostel block & room number.
-5️⃣ Checkout via Campus Pay Wallet, UPI, or Cash on Delivery.
-6️⃣ Our campus runner delivers your printed documents directly to your hostel room floor in 10-15 minutes!`;
-  }
-
-  if (intent === 'SERVICE_LIST' || intent === 'SERVICE_INFO') {
-    return `Here are the CampusHub services currently available:
-
-• **🖨️ PrintHub Cloud Printing**: Upload PDF/DOC documents for B&W (₹2/pg) or Color (₹10/pg) printing with optional Spiral Binding (₹49), delivered to your dorm room floor.
-• **💻 Laptop & Gadget Deep Cleaning**: Internal dust removal, thermal paste re-application, and keyboard sanitization (₹799).
-• **🧺 Dorm Laundry Pickup & Fold**: 5kg laundry wash, fabric softening, steam press, and neat fold (₹299).
-• **🧹 Hostel Room Deep Sanitization**: Floor scrubbing, desk clearing, and bathroom sanitization (₹199).
-• **🔄 Student Marketplace**: Trade pre-owned textbooks, lab coats, cycles, and hostel gear directly with dorm peers.
-
-You can ask me about pricing or how to book any of these services!`;
-  }
-
-  if (intent === 'MARKETPLACE_INFO') {
-    return `Hey ${userName}! 🤝 Campus Marketplace allows you to buy and sell second-hand textbooks, lab coats, cycles, and hostel gear directly with verified campus peers!`;
-  }
-
-  if (intent === 'COUPON_INFO') {
-    if (toolData.coupons && toolData.coupons.length > 0) {
-      const c = toolData.coupons[0];
-      return `🎉 Available Coupon Offer: Use code "${c.code}" for ${c.discountText} (Min Order: ₹${c.minOrderAmount})!`;
-    }
-  }
-
-  if (intent === 'CATEGORY_SEARCH' || intent === 'PRODUCT_CATEGORY_LIST') {
-    const cats = (toolData.categories && toolData.categories.length > 0) ? toolData.categories : await getCategories();
-    const catListText = cats.map(c => `• **${c.label}** (${c.itemsCount || 0} items available)`).join('\n');
-    return `Here are the product categories currently available on CampusHub:
-
-${catListText}
-
-Want me to show products from any of these categories?`;
-  }
-
-  const lq = query.toLowerCase();
-  if (lq.includes('what is') || lq.includes('about') || lq.includes('what can i do')) {
-    return `CampusHub is a 10-minute quick e-commerce & campus services platform! You can order hostel essentials, study supplies, snacks, upload PDFs for dorm print delivery, trade pre-owned books in the marketplace, or book room cleans!`;
-  }
-  if (lq.includes('register') || lq.includes('signup') || lq.includes('log in') || lq.includes('login') || lq.includes('account')) {
-    return `To register or log in, click the Login / Register button in the top navigation bar. Enter your college email and password to access your student profile, saved hostel addresses, and Campus Pay wallet balance!`;
-  }
-  if (lq.includes('order') || lq.includes('buy') || lq.includes('checkout')) {
-    return `To place an order: Browse items in the store, click '+ Add to Cart', open your Cart drawer, select your hostel room address, choose payment (COD, UPI, or Campus Pay Wallet), and confirm checkout!`;
-  }
-
-  return `Hey ${userName}! 👋 I can help you search live products, track orders, check Campus Pay wallet balance, calculate printing costs, or book dorm services. What do you need today?`;
+  return `Hey ${userName}! 🎒 Welcome to CampusHub! I can help you search for scientific calculators, notebooks, electric kettles, track your live orders, or check your Campus Pay wallet. How can I assist you today?`;
 }
 
 /**
- * Helper to validate response completeness and detect mid-sentence or section truncation
+ * Check if AI response was cut off mid-sentence
  */
-function isResponseTruncated(text, intent = '') {
-  if (!text || typeof text !== 'string') return true;
+function isResponseTruncated(text, intent) {
+  if (!text || typeof text !== 'string') return false;
   const trimmed = text.trim();
-  if (trimmed.length < 15) return true;
-
-  // Check abrupt sentence termination markers (dangling hyphens or connectors)
-  if (/[-([{:,\u2014]$/.test(trimmed)) return true;
-  if (/\b(?:and|or|the|with|for|a|an|is|are|of|to|in 10-|in 10-15)\s*$/i.test(trimmed)) return true;
-
-  // Mismatched parentheses or brackets across response
-  const openParens = (trimmed.match(/\(/g) || []).length;
-  const closeParens = (trimmed.match(/\)/g) || []).length;
-  if (openParens > closeParens + 1) return true;
-
+  if (trimmed.endsWith('...') || trimmed.endsWith('..') || trimmed.endsWith('in 10-') || trimmed.endsWith('in 10') || trimmed.endsWith('in') || trimmed.endsWith('to') || trimmed.endsWith('and') || trimmed.endsWith('the')) {
+    return true;
+  }
   return false;
 }
 
 /**
- * Auto-sanitizer that completes any broken sentences or missing sections in AI text
+ * Sanitize and Complete Any Response Text
  */
-function sanitizeAndCompleteResponse(text, intent = '', toolData = {}, user = null) {
-  if (!text || typeof text !== 'string') return '';
-
+function sanitizeAndCompleteResponse(text, intent, toolData, user) {
+  if (!text) return text;
   let cleaned = text.trim();
 
-  // Normalize any inline bullet point separators (" • ") into clean vertical newlines ("\n• ")
-  if (cleaned.includes(' • ')) {
-    cleaned = cleaned.replace(/\s*•\s*/g, '\n• ').trim();
-  }
-
-  // 1. Fix known truncated endings like "in 10-" or "in 10-15"
-  if (/in 10-$/i.test(cleaned)) {
-    cleaned += '15 minutes, delivered straight to your hostel room floor!';
-  } else if (/in 10-15\s*$/i.test(cleaned)) {
-    cleaned += ' minutes, delivered straight to your hostel room floor!';
-  } else if (/in 10-15 min(?:ute)?s?\s*$/i.test(cleaned)) {
-    cleaned += ', delivered straight to your hostel room floor!';
-  } else if (/[-([{:,\u2014]$/.test(cleaned)) {
-    cleaned = cleaned.replace(/[-([{:,\u2014]+$/, '').trim();
-    if (!/[.!?}$`'"]$/.test(cleaned)) {
-      cleaned += '.';
-    }
-  }
-
-  // 2. Intent-specific section completion
-  if (intent === 'PRODUCT_VS_SERVICES') {
-    const lower = cleaned.toLowerCase();
-    const hasProducts = lower.includes('product') || lower.includes('buy') || lower.includes('physical');
-    const hasServices = lower.includes('service') || lower.includes('printhub') || lower.includes('laundry') || lower.includes('clean');
-
-    if (hasProducts && !hasServices) {
-      cleaned += `\n\n🛠️ **CampusHub Utility Services**:\n• **What they are**: On-demand professional utility tasks booked for your dorm room or academic needs.\n• **PrintHub**: Cloud document printing (B&W ₹2/pg, Color ₹10/pg, Spiral Binding ₹49) delivered right to your hostel floor.\n• **Dorm Utility Services**: Schedule skilled helpers for Laptop Cleaning (₹799), Laundry Wash & Fold (₹299), or Room Deep Cleaning (₹199).\n• **Student Marketplace**: Trade pre-owned textbooks, lab coats, cycles, and hostel gear directly with verified dorm peers.`;
-    }
-  }
-
-  if (intent !== 'PRODUCT_CHEAPEST' && intent !== 'PRODUCT_OUT_OF_STOCK' && intent !== 'PRODUCT_MOST_EXPENSIVE') {
-    if (!/[.!?}\]"'`'’]$/.test(cleaned) && !cleaned.endsWith('**') && !cleaned.endsWith('__')) {
-      cleaned += '.';
-    }
+  // Fix mid-sentence truncation
+  if (cleaned.endsWith('in 10-') || cleaned.endsWith('in 10')) {
+    cleaned += '15 minutes campus runner delivery to your hostel floor!';
+  } else if (cleaned.endsWith('...')) {
+    cleaned = cleaned.slice(0, -3) + '.';
   }
 
   return cleaned;
 }
-

@@ -60,31 +60,56 @@ export const searchProducts = async ({
 
       if (query && query.trim()) {
         const stopWords = new Set(['show', 'me', 'the', 'under', 'below', 'less', 'than', 'more', 'with', 'available', 'cheap', 'cheapest', 'best', 'for', 'item', 'items', 'product', 'products', 'some', 'something', 'have', 'you', 'give', 'which', 'want', 'to', 'see', 'need', 'buying', 'pro', 'max', 'plus', 'mini', 'ultra', '1tb', '256gb', '512gb', 'edition']);
-        const words = query.trim().toLowerCase().split(/\s+/).filter(w => w.length >= 3 && !stopWords.has(w) && isNaN(w));
+        const words = query.trim().toLowerCase().split(/\s+/).filter(w => w.length >= 2 && !stopWords.has(w) && isNaN(w));
         const stemmedWords = words.map(w => (w.endsWith('s') && w.length > 3) ? w.slice(0, -1) : w);
 
         if (stemmedWords.length > 0) {
-          const regexPattern = stemmedWords.map(w => `\\b${w}`).join('|');
-          filter.$or = [
-            { title: { $regex: regexPattern, $options: 'i' } },
-            { categoryLabel: { $regex: regexPattern, $options: 'i' } },
-            { category: { $regex: regexPattern, $options: 'i' } },
-            { description: { $regex: regexPattern, $options: 'i' } }
-          ];
+          // If multiple search keywords exist, try AND matching first (all keywords present)
+          const andConditions = stemmedWords.map(w => ({
+            $or: [
+              { title: { $regex: `\\b${w}`, $options: 'i' } },
+              { categoryLabel: { $regex: `\\b${w}`, $options: 'i' } },
+              { category: { $regex: `\\b${w}`, $options: 'i' } },
+              { description: { $regex: `\\b${w}`, $options: 'i' } }
+            ]
+          }));
+
+          const strictFilter = { ...filter, $and: andConditions };
+          let strictMongoQuery = Product.find(strictFilter);
+          if (sortBy === 'price_asc') strictMongoQuery = strictMongoQuery.sort({ price: 1 });
+          else if (sortBy === 'price_desc') strictMongoQuery = strictMongoQuery.sort({ price: -1 });
+          else if (sortBy === 'rating') strictMongoQuery = strictMongoQuery.sort({ rating: -1 });
+          
+          let strictProducts = await strictMongoQuery.limit(limit).lean();
+
+          if (strictProducts.length > 0) {
+            products = strictProducts;
+          } else {
+            // Fallback to OR matching if strict AND match returned zero products
+            const regexPattern = stemmedWords.map(w => `\\b${w}`).join('|');
+            filter.$or = [
+              { title: { $regex: regexPattern, $options: 'i' } },
+              { categoryLabel: { $regex: regexPattern, $options: 'i' } },
+              { category: { $regex: regexPattern, $options: 'i' } },
+              { description: { $regex: regexPattern, $options: 'i' } }
+            ];
+          }
         }
       }
 
-      let mongoQuery = Product.find(filter);
+      if (products.length === 0) {
+        let mongoQuery = Product.find(filter);
 
-      if (sortBy === 'price_asc') {
-        mongoQuery = mongoQuery.sort({ price: 1 });
-      } else if (sortBy === 'price_desc') {
-        mongoQuery = mongoQuery.sort({ price: -1 });
-      } else if (sortBy === 'rating') {
-        mongoQuery = mongoQuery.sort({ rating: -1 });
+        if (sortBy === 'price_asc') {
+          mongoQuery = mongoQuery.sort({ price: 1 });
+        } else if (sortBy === 'price_desc') {
+          mongoQuery = mongoQuery.sort({ price: -1 });
+        } else if (sortBy === 'rating') {
+          mongoQuery = mongoQuery.sort({ rating: -1 });
+        }
+
+        products = await mongoQuery.limit(limit).lean();
       }
-
-      products = await mongoQuery.limit(limit).lean();
 
       // If category filter was provided but strict keyword filter returned 0, try category search alone
       if (products.length === 0 && category && category !== 'all') {
@@ -131,18 +156,27 @@ export const searchProducts = async ({
 
     if (query && query.trim()) {
       const stopWords = new Set(['show', 'me', 'the', 'under', 'below', 'less', 'than', 'more', 'with', 'available', 'cheap', 'cheapest', 'best', 'for', 'item', 'items', 'product', 'products', 'some', 'something', 'have', 'you', 'give', 'which', 'want', 'to', 'see', 'need', 'buying', 'pro', 'max', 'plus', 'mini', 'ultra', '1tb', '256gb', '512gb', 'edition']);
-      const words = query.trim().toLowerCase().split(/\s+/).filter(w => w.length >= 3 && !stopWords.has(w) && isNaN(w));
+      const words = query.trim().toLowerCase().split(/\s+/).filter(w => w.length >= 2 && !stopWords.has(w) && isNaN(w));
       const stemmedWords = words.map(w => (w.endsWith('s') && w.length > 3) ? w.slice(0, -1) : w);
 
       if (stemmedWords.length > 0) {
-        const kwFiltered = filtered.filter(p => {
+        // Score products based on how many search keywords they match
+        const scoredProducts = filtered.map(p => {
           const text = `${p.title} ${p.categoryLabel || ''} ${p.category} ${p.description || ''}`.toLowerCase();
-          return stemmedWords.some(w => new RegExp(`\\b${w}`, 'i').test(text));
-        });
-        if (kwFiltered.length > 0) {
-          filtered = kwFiltered;
-        } else if (query.trim().length >= 3) {
-          // Specific product search returned zero matches
+          let score = 0;
+          for (const w of stemmedWords) {
+            if (new RegExp(`\\b${w}`, 'i').test(text)) {
+              score++;
+            }
+          }
+          return { product: p, score };
+        }).filter(item => item.score > 0);
+
+        if (scoredProducts.length > 0) {
+          const maxScore = Math.max(...scoredProducts.map(item => item.score));
+          // If items match multiple keywords (e.g. "exam" AND "kit"), keep only top max-score matches
+          filtered = scoredProducts.filter(item => item.score === maxScore).map(item => item.product);
+        } else if (query.trim().length >= 2) {
           return [];
         }
       }

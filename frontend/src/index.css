@@ -3113,7 +3113,8 @@ img {
 .ai-chat-window {
   width: 380px;
   max-width: calc(100vw - 32px);
-  height: 520px;
+  height: 540px;
+  max-height: calc(100vh - 80px);
   background-color: #ffffff;
   border-radius: 16px;
   box-shadow: 0 12px 36px rgba(11, 19, 41, 0.25);
@@ -3145,6 +3146,7 @@ img {
   align-items: center;
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  flex-shrink: 0;
 }
 
 .ai-chat-header h4 {
@@ -3177,7 +3179,8 @@ img {
 
 .ai-chat-body {
   flex: 1;
-  padding: 1rem;
+  min-height: 0;
+  padding: 1rem 1rem 1.5rem 1rem;
   overflow-y: auto;
   overflow-x: hidden;
   display: flex;
@@ -3218,7 +3221,7 @@ img {
 }
 
 .chat-bubble {
-  max-width: 88%;
+  max-width: 90%;
   padding: 0.75rem 1rem;
   border-radius: 14px;
   font-size: 0.84rem;
@@ -3298,10 +3301,14 @@ img {
 
 .ai-chat-footer {
   display: flex;
-  padding: 0.75rem;
+  padding: 0.75rem 1rem;
   border-top: 1px solid #e2e8f0;
   background-color: #ffffff;
   gap: 0.5rem;
+  flex-shrink: 0;
+  position: relative;
+  z-index: 5;
+  box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.04);
 }
 
 .ai-chat-footer input {
